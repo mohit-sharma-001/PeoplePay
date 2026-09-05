@@ -519,7 +519,7 @@ export const EmployeeDetailsPage: React.FC = () => {
                 User Account Linked
               </span>
             )}
-            {isHRorAdmin && employee.status !== 'Terminated' && (
+            {isAdmin && employee.status !== 'Terminated' && (
               <Button
                 variant="outline"
                 size="sm"

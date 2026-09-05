@@ -21,12 +21,12 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     action_allowed_roles = {
         'list': ['Admin', 'HR Payroll Manager', 'HR Payroll User', 'HR Manager', 'Employee'],
         'retrieve': ['Admin', 'HR Payroll Manager', 'HR Payroll User', 'HR Manager', 'Employee'],
-        'create': ['Admin', 'HR Payroll Manager', 'HR Manager'],
-        'update': ['Admin', 'HR Payroll Manager', 'HR Manager'],
-        'partial_update': ['Admin', 'HR Payroll Manager', 'HR Manager'],
+        'create': ['Admin', 'HR Payroll Manager', 'HR Payroll User', 'HR Manager'],
+        'update': ['Admin', 'HR Payroll Manager', 'HR Payroll User', 'HR Manager'],
+        'partial_update': ['Admin', 'HR Payroll Manager', 'HR Payroll User', 'HR Manager'],
         'destroy': ['Admin'],
-        'create_login': ['Admin', 'HR Payroll Manager', 'HR Manager'],
-        'terminate': ['Admin', 'HR Payroll Manager', 'HR Manager'],
+        'create_login': ['Admin', 'HR Payroll Manager', 'HR Payroll User', 'HR Manager'],
+        'terminate': ['Admin'],
         'reactivate': ['Admin'],
     }
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
@@ -69,6 +69,12 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         Restricted to Admin and HR Manager. Handles optional roles assignment for Admin.
         """
         employee = self.get_object()
+
+        if employee.status == Employee.Status.TERMINATED:
+            return Response(
+                {"detail": "Cannot create login account for a terminated employee."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         if employee.user:
             return Response(
@@ -161,14 +167,15 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         employee.terminated_at = timezone.now()
         employee.save(update_fields=['status', 'termination_reason', 'terminated_at', 'updated_at'])
 
-        # Close running contract date_end to today
+        # Close and cancel running contracts
         today = timezone.now().date()
         from contracts.models import Contract
         contracts = Contract.objects.filter(employee=employee)
         for c in contracts:
             if c.effective_state == 'running':
                 c.date_end = today
-                c.save(update_fields=['date_end', 'updated_at'])
+                c.state = Contract.State.CANCELLED
+                c.save(update_fields=['date_end', 'state', 'updated_at'])
 
         # Disable linked user account if present
         if employee.user:
@@ -206,6 +213,14 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         if employee.user:
             employee.user.is_active = True
             employee.user.save(update_fields=['is_active'])
+
+        # Reactivate contract(s) that were cancelled on termination
+        from contracts.models import Contract
+        cancelled_contracts = Contract.objects.filter(employee=employee, state=Contract.State.CANCELLED)
+        for c in cancelled_contracts:
+            c.state = Contract.State.RUNNING
+            c.date_end = None
+            c.save(update_fields=['state', 'date_end', 'updated_at'])
 
         serializer = self.get_serializer(employee)
         return Response(serializer.data, status=status.HTTP_200_OK)

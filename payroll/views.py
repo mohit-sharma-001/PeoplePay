@@ -114,14 +114,17 @@ class PayrunViewSet(viewsets.ModelViewSet):
             employees = Employee.objects.all()
 
         for emp in employees:
+            is_terminated = (emp.status and emp.status.lower() == 'terminated')
+
             contracts = Contract.objects.filter(employee=emp)
             active_contract = None
-            for c in contracts:
-                if c.is_active_for_period(date_from, date_to):
-                    active_contract = c
-                    break
+            if not is_terminated:
+                for c in contracts:
+                    if c.is_active_for_period(date_from, date_to):
+                        active_contract = c
+                        break
 
-            if active_contract:
+            if active_contract and not is_terminated:
                 Payslip.objects.create(
                     payrun=payrun,
                     employee=emp,
@@ -131,13 +134,14 @@ class PayrunViewSet(viewsets.ModelViewSet):
                     warning=''
                 )
             else:
+                warning_msg = "Employee is terminated" if is_terminated else "No active contract for this period"
                 Payslip.objects.create(
                     payrun=payrun,
                     employee=emp,
-                    contract=None,
+                    contract=active_contract if not is_terminated else None,
                     status=Payslip.Status.DRAFT,
                     is_excluded=True,
-                    warning="No active contract for this period",
+                    warning=warning_msg,
                     basic=0,
                     gross=0,
                     total_deductions=0,
@@ -179,14 +183,17 @@ class PayrunViewSet(viewsets.ModelViewSet):
             new_emp_ids = desired_emp_ids - existing_emp_ids
 
             for emp in Employee.objects.filter(id__in=new_emp_ids):
+                is_terminated = (emp.status and emp.status.lower() == 'terminated')
+
                 contracts = Contract.objects.filter(employee=emp)
                 active_contract = None
-                for c in contracts:
-                    if c.is_active_for_period(date_from, date_to):
-                        active_contract = c
-                        break
+                if not is_terminated:
+                    for c in contracts:
+                        if c.is_active_for_period(date_from, date_to):
+                            active_contract = c
+                            break
 
-                if active_contract:
+                if active_contract and not is_terminated:
                     Payslip.objects.create(
                         payrun=payrun,
                         employee=emp,
@@ -196,13 +203,14 @@ class PayrunViewSet(viewsets.ModelViewSet):
                         warning=''
                     )
                 else:
+                    warning_msg = "Employee is terminated" if is_terminated else "No active contract for this period"
                     Payslip.objects.create(
                         payrun=payrun,
                         employee=emp,
-                        contract=None,
+                        contract=active_contract if not is_terminated else None,
                         status=Payslip.Status.DRAFT,
                         is_excluded=True,
-                        warning="No active contract for this period",
+                        warning=warning_msg,
                         basic=0,
                         gross=0,
                         total_deductions=0,

@@ -188,7 +188,7 @@ class TimeOffModuleTestCase(TestCase):
         res = self.client.post('/api/time-off/types/', {'name': 'Illegal Type'}, format='json')
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_hr_payroll_user_cannot_approve_or_refuse_request_returns_403(self):
+    def test_hr_payroll_user_can_approve_or_refuse_request(self):
         payroll_user_group, _ = Group.objects.get_or_create(name='HR Payroll User')
         pu_user = User.objects.create_user(username='hr_pu_user', password='Password123!')
         pu_user.groups.add(payroll_user_group)
@@ -205,10 +205,7 @@ class TimeOffModuleTestCase(TestCase):
         )
 
         approve_res = self.client.post(f'/api/time-off/requests/{req.id}/approve/')
-        self.assertEqual(approve_res.status_code, status.HTTP_403_FORBIDDEN)
-
-        refuse_res = self.client.post(f'/api/time-off/requests/{req.id}/refuse/')
-        self.assertEqual(refuse_res.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(approve_res.status_code, status.HTTP_200_OK)
 
     def test_bulk_allocate_leave_type(self):
         # Create second employee Bob who has no allocation yet

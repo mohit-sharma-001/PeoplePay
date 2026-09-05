@@ -23,11 +23,11 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         'check_in': ['Admin', 'HR Payroll Manager', 'HR Payroll User', 'HR Manager', 'Employee'],
         'check_out': ['Admin', 'HR Payroll Manager', 'HR Payroll User', 'HR Manager', 'Employee'],
         'my_status': ['Admin', 'HR Payroll Manager', 'HR Payroll User', 'HR Manager', 'Employee'],
-        'create': ['Admin', 'HR Payroll Manager', 'HR Manager'],
-        'update': ['Admin', 'HR Payroll Manager', 'HR Manager'],
-        'partial_update': ['Admin', 'HR Payroll Manager', 'HR Manager'],
-        'destroy': ['Admin', 'HR Payroll Manager', 'HR Manager'],
-        'approve_correction': ['Admin', 'HR Payroll Manager', 'HR Manager'],
+        'create': ['Admin', 'HR Payroll Manager', 'HR Payroll User', 'HR Manager'],
+        'update': ['Admin', 'HR Payroll Manager', 'HR Payroll User', 'HR Manager'],
+        'partial_update': ['Admin', 'HR Payroll Manager', 'HR Payroll User', 'HR Manager'],
+        'destroy': ['Admin', 'HR Payroll Manager', 'HR Payroll User', 'HR Manager'],
+        'approve_correction': ['Admin', 'HR Payroll Manager', 'HR Payroll User', 'HR Manager'],
     }
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['employee__first_name', 'employee__last_name', 'employee__employee_code', 'notes']

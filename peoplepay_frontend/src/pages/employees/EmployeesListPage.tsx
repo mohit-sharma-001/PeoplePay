@@ -153,8 +153,8 @@ export const EmployeesListPage: React.FC = () => {
         <div className="flex items-center gap-3">
           <Avatar src={item.avatarUrl} name={`${item.firstName} ${item.lastName}`} size="md" />
           <div>
-            <span className="font-semibold text-slate-900 dark:text-slate-100 block">{item.firstName} {item.lastName}</span>
-            <span className="text-xs text-slate-400 font-mono">{item.code}</span>
+            <span className="font-semibold text-[var(--text-primary)] block">{item.firstName} {item.lastName}</span>
+            <span className="text-xs text-[var(--text-secondary)] font-mono font-semibold">{item.code}</span>
           </div>
         </div>
       ),
@@ -165,8 +165,8 @@ export const EmployeesListPage: React.FC = () => {
       sortable: true,
       accessor: (item) => (
         <div>
-          <span className="font-medium text-slate-900 dark:text-slate-100 block">{item.jobTitle}</span>
-          <span className="text-xs text-slate-500 dark:text-slate-400">{item.department}</span>
+          <span className="font-medium text-[var(--text-primary)] block">{item.jobTitle}</span>
+          <span className="text-xs text-[var(--text-secondary)]">{item.department}</span>
         </div>
       ),
     },
@@ -178,7 +178,7 @@ export const EmployeesListPage: React.FC = () => {
     {
       key: 'workingScheduleName',
       header: 'Working Schedule',
-      accessor: (item) => <span className="text-xs font-medium text-slate-600 dark:text-slate-400">{item.workingScheduleName}</span>,
+      accessor: (item) => <span className="text-xs font-semibold text-[var(--text-primary)]">{item.workingScheduleName}</span>,
     },
     {
       key: 'status',

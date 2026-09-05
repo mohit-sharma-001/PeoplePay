@@ -330,10 +330,10 @@ class EmployeeAPITestCase(TestCase):
         res_react = self.client.post(f'/api/employees/{self.employee.id}/reactivate/', {}, format='json')
         self.assertEqual(res_react.status_code, status.HTTP_403_FORBIDDEN)
 
-        # HR Manager can terminate but NOT reactivate
+        # HR Manager cannot terminate or reactivate (only Admin)
         self.client.force_authenticate(user=hr_user)
         res_hr_term = self.client.post(f'/api/employees/{self.employee.id}/terminate/', {}, format='json')
-        self.assertEqual(res_hr_term.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_hr_term.status_code, status.HTTP_403_FORBIDDEN)
 
         res_hr_react = self.client.post(f'/api/employees/{self.employee.id}/reactivate/', {}, format='json')
         self.assertEqual(res_hr_react.status_code, status.HTTP_403_FORBIDDEN)

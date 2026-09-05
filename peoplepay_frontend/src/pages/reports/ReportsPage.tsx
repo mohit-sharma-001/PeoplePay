@@ -295,11 +295,15 @@ export const ReportsPage: React.FC = () => {
 
       {liabilityData && (
         <Card className="space-y-4">
-          <CardHeader>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <CardHeader className="flex-col !items-stretch gap-3 w-full">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
               <div>
-                <CardTitle className="text-base">Time Off Balances & Leave Liability Valuation</CardTitle>
-                <p className="text-xs text-[var(--text-secondary)] mt-0.5">Approximation based on contract daily rate (wage / 30.0)</p>
+                <CardTitle className="text-base font-bold text-[var(--text-primary)]">
+                  Time Off Balances & Leave Liability Valuation
+                </CardTitle>
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                  Approximation based on contract daily rate (wage / 30.0)
+                </p>
               </div>
 
               <div className="flex items-center gap-3 shrink-0">
@@ -320,17 +324,19 @@ export const ReportsPage: React.FC = () => {
 
             {/* Leave Utilization Trend Pills */}
             {liabilityData.utilization_trend && liabilityData.utilization_trend.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-[var(--border-color)] flex items-center gap-2 flex-wrap text-xs">
-                <span className="font-semibold text-[var(--text-secondary)] flex items-center gap-1.5">
+              <div className="pt-3 border-t border-[var(--border-color)] flex items-center gap-2 flex-wrap text-xs w-full">
+                <span className="font-semibold text-[var(--text-secondary)] flex items-center gap-1.5 shrink-0">
                   <TrendingUp className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                   Leave Request Utilization Trend (Last 3 Months):
                 </span>
-                {liabilityData.utilization_trend.map((trend) => (
-                  <Badge key={trend.month} variant="blue" className="font-mono text-xs flex items-center gap-1">
-                    <Calendar className="w-3 h-3" />
-                    {trend.month}: {trend.approved_requests} approved
-                  </Badge>
-                ))}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {liabilityData.utilization_trend.map((trend) => (
+                    <Badge key={trend.month} variant="blue" className="font-mono text-xs flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      {trend.month}: {trend.approved_requests} approved
+                    </Badge>
+                  ))}
+                </div>
               </div>
             )}
           </CardHeader>

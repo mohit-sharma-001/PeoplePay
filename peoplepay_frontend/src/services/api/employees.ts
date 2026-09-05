@@ -64,6 +64,28 @@ export const employeesApi = {
     return { ...res, data };
   },
 
+  async createSchedule(payload: any): Promise<ApiResponse<WorkingSchedule>> {
+    const res = await apiFetch<any>('/api/working-schedule/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return { ...res, data: mapWorkingSchedule(res.data) };
+  },
+
+  async updateSchedule(id: string, payload: any): Promise<ApiResponse<WorkingSchedule>> {
+    const res = await apiFetch<any>(`/api/working-schedule/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+    return { ...res, data: mapWorkingSchedule(res.data) };
+  },
+
+  async deleteSchedule(id: string): Promise<ApiResponse<null>> {
+    return await apiFetch<null>(`/api/working-schedule/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+
   async create(payload: any): Promise<ApiResponse<Employee>> {
     const res = await apiFetch<any>('/api/employees/', {
       method: 'POST',
