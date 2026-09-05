@@ -7,7 +7,13 @@ The `urlpatterns` list routes URLs to views. For more information please see:
 from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import RedirectView
-from core.auth_views import login_view, logout_view
+from core.auth_views import (
+    login_view,
+    logout_view,
+    register_view,
+    list_users_view,
+    assign_role_view,
+)
 
 urlpatterns = [
     path('', RedirectView.as_view(url='/api/', permanent=False), name='root-redirect'),
@@ -15,6 +21,9 @@ urlpatterns = [
     path('api/', include('core.urls')),
     path('api/auth/login/', login_view, name='api-auth-login'),
     path('api/auth/logout/', logout_view, name='api-auth-logout'),
+    path('api/auth/register/', register_view, name='api-auth-register'),
+    path('api/auth/users/', list_users_view, name='api-auth-users'),
+    path('api/auth/users/<int:user_id>/assign-role/', assign_role_view, name='api-auth-assign-role'),
     path('api/employees/', include('employees.urls')),
     path('api/contracts/', include('contracts.urls')),
     path('api/working-schedule/', include('working_schedule.urls')),

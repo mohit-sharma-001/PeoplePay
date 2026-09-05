@@ -63,6 +63,198 @@ The API server will run at `http://127.0.0.1:8000/`.
 
 ---
 
+---
+
+## Authentication & User Role Management API Endpoints
+
+### 1. Public Self-Registration
+* **URL:** `POST /api/auth/register/`
+* **Access:** Public (`permission_classes = [AllowAny]`)
+* **Description:** Registers a new User account and auto-creates a linked `Employee` profile. Assigns the user strictly to the `"Employee"` role group (ignoring any privilege escalation attempts). Automatically generates a DRF Auth Token.
+
+#### Request Body
+```json
+{
+  "username": "johndoe",
+  "password": "Password123!",
+  "email": "john.doe@example.com",
+  "first_name": "John",
+  "last_name": "Doe",
+  "phone": "+15550192834",
+  "department": "Engineering",
+  "job_position": "Software Engineer"
+}
+```
+
+#### Success Response (`HTTP 201 Created`)
+```json
+{
+  "success": true,
+  "message": "User registered successfully.",
+  "data": {
+    "token": "a1b2c3d4e5f67890123456789abcdef012345678",
+    "user": {
+      "id": 12,
+      "username": "johndoe",
+      "email": "john.doe@example.com",
+      "first_name": "John",
+      "last_name": "Doe",
+      "is_superuser": false,
+      "roles": [
+        "Employee"
+      ],
+      "employee_id": 8
+    }
+  },
+  "errors": null
+}
+```
+
+#### Validation Error Response (`HTTP 400 Bad Request`)
+```json
+{
+  "success": false,
+  "message": "Registration failed.",
+  "data": null,
+  "errors": {
+    "username": "Username is already taken.",
+    "email": "Email is already registered."
+  }
+}
+```
+
+---
+
+### 2. User Authentication (Login & Logout)
+* **Login URL:** `POST /api/auth/login/` (Public)
+* **Logout URL:** `POST /api/auth/logout/` (Authenticated)
+
+#### Login Request Body
+```json
+{
+  "username": "admin",
+  "password": "password123"
+}
+```
+
+#### Login Success Response (`HTTP 200 OK`)
+```json
+{
+  "success": true,
+  "message": "Login successful.",
+  "data": {
+    "token": "9944b09199c62bcf9418ad846d0a400ed254425b",
+    "user": {
+      "id": 1,
+      "username": "admin",
+      "email": "admin@peoplepay360.com",
+      "first_name": "System",
+      "last_name": "Admin",
+      "is_superuser": true,
+      "roles": [
+        "Admin"
+      ],
+      "employee_id": 1
+    }
+  },
+  "errors": null
+}
+```
+
+---
+
+### 3. Admin List Users
+* **URL:** `GET /api/auth/users/` (or with query filter `GET /api/auth/users/?role=Employee`)
+* **Access:** Restricted to `"Admin"` role users.
+* **Description:** Retrieves all user accounts in the system with their assigned roles and linked employee details.
+
+#### Success Response (`HTTP 200 OK`)
+```json
+{
+  "success": true,
+  "message": "Users retrieved successfully.",
+  "data": [
+    {
+      "id": 1,
+      "username": "admin",
+      "email": "admin@peoplepay360.com",
+      "first_name": "System",
+      "last_name": "Admin",
+      "is_superuser": true,
+      "roles": [
+        "Admin"
+      ],
+      "employee_id": 1,
+      "employee_name": "System Admin"
+    },
+    {
+      "id": 12,
+      "username": "johndoe",
+      "email": "john.doe@example.com",
+      "first_name": "John",
+      "last_name": "Doe",
+      "is_superuser": false,
+      "roles": [
+        "Employee"
+      ],
+      "employee_id": 8,
+      "employee_name": "John Doe"
+    }
+  ],
+  "errors": null
+}
+```
+
+---
+
+### 4. Admin Role Assignment
+* **URL:** `PATCH /api/auth/users/{user_id}/assign-role/`
+* **Access:** Restricted to `"Admin"` role users.
+* **Description:** Replaces a user's group roles entirely with the provided list of roles.
+
+#### Request Body
+```json
+{
+  "roles": [
+    "HR Manager"
+  ]
+}
+```
+
+#### Success Response (`HTTP 200 OK`)
+```json
+{
+  "success": true,
+  "message": "User roles updated successfully.",
+  "data": {
+    "id": 12,
+    "username": "johndoe",
+    "email": "john.doe@example.com",
+    "first_name": "John",
+    "last_name": "Doe",
+    "roles": [
+      "HR Manager"
+    ],
+    "employee_id": 8
+  },
+  "errors": null
+}
+```
+
+#### Invalid Role Error Response (`HTTP 400 Bad Request`)
+```json
+{
+  "success": false,
+  "message": "Invalid role assignment.",
+  "data": null,
+  "errors": {
+    "roles": "Invalid role(s): SuperUserRole. Valid roles are: Admin, HR Manager, HR Payroll Manager, HR Payroll User, Employee."
+  }
+}
+```
+
+---
+
 ## Base API Endpoints
 
 - Health Check: `GET /api/`

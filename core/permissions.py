@@ -34,6 +34,8 @@ class HasRole(permissions.BasePermission):
             allowed_roles = action_roles_map.get(view.action)
         else:
             allowed_roles = getattr(view, 'allowed_roles', None)
+            if not allowed_roles and hasattr(request, 'resolver_match') and request.resolver_match and hasattr(request.resolver_match, 'func'):
+                allowed_roles = getattr(request.resolver_match.func, 'allowed_roles', None)
 
         if not allowed_roles:
             return True
