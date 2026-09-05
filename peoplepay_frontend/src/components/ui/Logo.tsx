@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '../../lib/utils';
+import { useTheme } from '../../context/ThemeContext';
 
 export interface LogoProps {
   variant?: 'full' | 'icon';
@@ -14,6 +15,8 @@ export const Logo: React.FC<LogoProps> = ({
   theme = 'light',
   className,
 }) => {
+  const { brandPreset } = useTheme();
+
   const iconSizes = {
     sm: 24,
     md: 32,
@@ -22,6 +25,9 @@ export const Logo: React.FC<LogoProps> = ({
   };
 
   const px = iconSizes[size];
+
+  const primaryStroke = brandPreset === 'classic-blue' ? '#2563EB' : '#714B67';
+  const secondaryStroke = brandPreset === 'classic-blue' ? '#1D4ED8' : '#5B3D54';
 
   return (
     <div className={cn('inline-flex items-center gap-3 select-none', className)}>
@@ -37,14 +43,14 @@ export const Logo: React.FC<LogoProps> = ({
         {/* Outer 360 Degree Arch Gradient Loop */}
         <path
           d="M24 6C14.0589 6 6 14.0589 6 24C6 33.9411 14.0589 42 24 42C31.5434 42 37.9943 37.3364 40.6481 30.75"
-          stroke="#714B67"
+          stroke={primaryStroke}
           strokeWidth="4.5"
           strokeLinecap="round"
         />
         {/* Inner Counter Arc */}
         <path
           d="M34 24C34 29.5228 29.5228 34 24 34C18.4772 34 14 29.5228 14 24C14 18.4772 18.4772 14 24 14"
-          stroke="#5B3D54"
+          stroke={secondaryStroke}
           strokeWidth="3.5"
           strokeLinecap="round"
           strokeDasharray="1 3"
@@ -69,7 +75,7 @@ export const Logo: React.FC<LogoProps> = ({
             <span className={theme === 'dark' ? 'text-white' : 'text-slate-900'}>
               PEOPLE
             </span>
-            <span className="text-[#714B67]">PAY</span>
+            <span style={{ color: primaryStroke }}>PAY</span>
             <span className="text-[#F59E0B]">360</span>
           </div>
           <span

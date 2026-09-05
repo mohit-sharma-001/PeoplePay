@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
 @layer base {
-  /* LIGHT THEME (DEFAULT) */
+  /* DEFAULT BASE (ODOO PURPLE + LIGHT) */
   :root,
+  [data-brand="odoo-purple"][data-theme="light"],
   [data-theme="light"] {
     --bg-primary: #FAFAF9;
     --bg-surface: #FFFFFF;
@@ -35,7 +36,36 @@
     --color-info: #3B82F6;
   }
 
-  /* DARK THEME */
+  /* CLASSIC BLUE + LIGHT */
+  [data-brand="classic-blue"][data-theme="light"] {
+    --bg-primary: #F8FAFC;
+    --bg-surface: #FFFFFF;
+    --bg-surface-elevated: #F1F5F9;
+    --bg-sidebar: #FFFFFF;
+    --border-color: #E2E8F0;
+    --border-subtle: #F1F5F9;
+
+    --text-primary: #0F172A;
+    --text-secondary: #475569;
+    --text-muted: #94A3B8;
+
+    --brand-primary: #2563EB;
+    --brand-primary-hover: #1D4ED8;
+    --brand-primary-light: #EFF6FF;
+    --brand-primary-border: #BFDBFE;
+
+    --brand-accent: #F59E0B;
+    --brand-accent-hover: #D97706;
+    --brand-accent-light: #FFF4DE;
+
+    --card-bg: #FFFFFF;
+    --header-bg: #FFFFFF;
+    --table-header-bg: #F8FAFC;
+    --table-row-hover: #F1F5F9;
+  }
+
+  /* ODOO PURPLE + DARK */
+  [data-brand="odoo-purple"][data-theme="dark"],
   [data-theme="dark"] {
     --bg-primary: #0D0B0D;
     --bg-surface: #171417;
@@ -61,6 +91,34 @@
     --header-bg: #171417;
     --table-header-bg: #211D20;
     --table-row-hover: #262125;
+  }
+
+  /* CLASSIC BLUE + DARK */
+  [data-brand="classic-blue"][data-theme="dark"] {
+    --bg-primary: #0F172A;
+    --bg-surface: #1E293B;
+    --bg-surface-elevated: #334155;
+    --bg-sidebar: #1E293B;
+    --border-color: rgba(255, 255, 255, 0.10);
+    --border-subtle: rgba(255, 255, 255, 0.05);
+
+    --text-primary: #F8FAFC;
+    --text-secondary: #94A3B8;
+    --text-muted: #64748B;
+
+    --brand-primary: #3B82F6;
+    --brand-primary-hover: #60A5FA;
+    --brand-primary-light: rgba(59, 130, 246, 0.18);
+    --brand-primary-border: rgba(59, 130, 246, 0.3);
+
+    --brand-accent: #F59E0B;
+    --brand-accent-hover: #D97706;
+    --brand-accent-light: rgba(245, 158, 11, 0.15);
+
+    --card-bg: #1E293B;
+    --header-bg: #1E293B;
+    --table-header-bg: #334155;
+    --table-row-hover: #2A3649;
   }
 
   /* CUSTOM — CINEMATIC THEME (FILM ATMOSPHERE BEHIND UI) */
@@ -91,6 +149,13 @@
     --table-row-hover: rgba(45, 38, 45, 0.6);
   }
 
+  [data-brand="classic-blue"][data-theme="custom"][data-background="cinematic"] {
+    --brand-primary: #60A5FA;
+    --brand-primary-hover: #93C5FD;
+    --brand-primary-light: rgba(96, 165, 250, 0.22);
+    --brand-primary-border: rgba(96, 165, 250, 0.35);
+  }
+
   /* CUSTOM — VOID THEME (PURE MINIMAL BLACK) */
   [data-theme="custom"][data-background="void"] {
     --bg-primary: #000000;
@@ -117,6 +182,13 @@
     --card-bg: #0A0A0A;
     --table-header-bg: #141414;
     --table-row-hover: #1A1A1A;
+  }
+
+  [data-brand="classic-blue"][data-theme="custom"][data-background="void"] {
+    --brand-primary: #3B82F6;
+    --brand-primary-hover: #60A5FA;
+    --brand-primary-light: rgba(59, 130, 246, 0.2);
+    --brand-primary-border: #1E3A8A;
   }
 
   body {
