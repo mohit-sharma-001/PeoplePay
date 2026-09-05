@@ -1,0 +1,344 @@
+===============================================================================
+PEOPLEPAY360 BACKEND - COMPLETE STEP-BY-STEP API & FEATURE TESTING GUIDE
+===============================================================================
+
+-------------------------------------------------------------------------------
+PREREQUISITES: ENVIRONMENT & SERVER STARTUP COMMANDS
+-------------------------------------------------------------------------------
+1. Check PostgreSQL Database Service (ensure DB 'peoplepay360_db' is running):
+   pg_isready -h localhost -p 5432
+
+2. Activate Python Virtual Environment:
+   source venv/bin/activate
+
+3. Start Django REST API Development Server:
+   python manage.py runserver
+
+* Note: Default API server runs at http://127.0.0.1:8000/
+
+-------------------------------------------------------------------------------
+STEP 0: CREATE NEW ADMIN USER
+-------------------------------------------------------------------------------
+FEATURE TESTED:
+User Account Provisioning & Role-Based Access Control (RBAC). Grants Django
+superuser/staff permissions and assigns the user to the 'Admin' RBAC Group.
+
+RUNNING COMMAND (Option A - Interactive):
+python manage.py createsuperuser --username admin --email admin@peoplepay360.com
+
+RUNNING COMMAND (Option B - Non-Interactive One-Liner):
+python manage.py shell -c "from django.contrib.auth.models import User, Group; u, _ = User.objects.get_or_create(username='admin', defaults={'email':'admin@peoplepay360.com', 'is_superuser':True, 'is_staff':True}); u.set_password('admin123'); u.save(); g, _ = Group.objects.get_or_create(name='Admin'); u.groups.add(g)"
+
+-------------------------------------------------------------------------------
+STEP 1: ADMIN LOGIN & TOKEN AUTHENTICATION
+-------------------------------------------------------------------------------
+FEATURE TESTED:
+Token-Based Authentication Endpoint (/api/auth/login/). Authenticates user credentials,
+generates Django REST Framework Auth Token, and retrieves assigned RBAC roles.
+
+RUNNING COMMAND:
+curl -X POST http://127.0.0.1:8000/api/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "admin",
+    "password": "admin123"
+  }'
+
+EXPECTED RESPONSE (HTTP 200 OK):
+{
+  "status": "success",
+  "message": "Login successful.",
+  "data": {
+    "token": "ca9807b61fb9affe3ab6bf02fd6dcf529b73558e",
+    "user": {
+      "id": 1,
+      "username": "admin",
+      "email": "admin@peoplepay360.com",
+      "first_name": "",
+      "last_name": "",
+      "is_superuser": true,
+      "roles": ["Admin"],
+      "employee_id": null
+    }
+  },
+  "errors": null
+}
+
+* IMPORTANT: Copy your returned token key and use it in the 'Authorization: Token <token>' header for all subsequent API requests.
+
+-------------------------------------------------------------------------------
+STEP 2: CREATE WORKING SCHEDULE WITH DAILY LINES
+-------------------------------------------------------------------------------
+FEATURE TESTED:
+Shift Template Management & Computed Weekly Hours (/api/working-schedule/).
+Tests nested creation of schedule lines (Mon-Fri 9:00 to 17:00 with 60m break)
+and verifies @property total_weekly_hours dynamic calculation.
+
+RUNNING COMMAND:
+curl -X POST http://127.0.0.1:8000/api/working-schedule/ \
+  -H "Authorization: Token ca9807b61fb9affe3ab6bf02fd6dcf529b73558e" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Standard 40h Shift Template",
+    "schedule_type": "fixed",
+    "company_name": "PeoplePay Corp",
+    "lines": [
+      {"day_of_week": 0, "start_time": "09:00:00", "end_time": "17:00:00", "break_minutes": 60},
+      {"day_of_week": 1, "start_time": "09:00:00", "end_time": "17:00:00", "break_minutes": 60},
+      {"day_of_week": 2, "start_time": "09:00:00", "end_time": "17:00:00", "break_minutes": 60},
+      {"day_of_week": 3, "start_time": "09:00:00", "end_time": "17:00:00", "break_minutes": 60},
+      {"day_of_week": 4, "start_time": "09:00:00", "end_time": "17:00:00", "break_minutes": 60}
+    ]
+  }'
+
+EXPECTED RESPONSE (HTTP 201 Created):
+{
+  "id": 1,
+  "name": "Standard 40h Shift Template",
+  "schedule_type": "fixed",
+  "company_name": "PeoplePay Corp",
+  "total_weekly_hours": 35.0,
+  "lines": [...]
+}
+
+-------------------------------------------------------------------------------
+STEP 3: CREATE AN EMPLOYEE RECORD WITH LINKED USER ACCOUNT
+-------------------------------------------------------------------------------
+FEATURE TESTED:
+Employee Onboarding & Account Provisioning (/api/employees/).
+Tests auto-generation of unique employee_code (e.g. EMP0001), department assignment,
+working schedule assignment, and automatic creation of a linked User account.
+
+RUNNING COMMAND:
+curl -X POST http://127.0.0.1:8000/api/employees/ \
+  -H "Authorization: Token ca9807b61fb9affe3ab6bf02fd6dcf529b73558e" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "first_name": "John",
+    "last_name": "Doe",
+    "email": "john.doe@peoplepay360.com",
+    "phone": "+1234567890",
+    "department": "Engineering",
+    "job_position": "Software Engineer",
+    "status": "active",
+    "date_joined": "2026-01-01",
+    "working_schedule": 1,
+    "user_username": "john.doe",
+    "user_password": "Password123!",
+    "role": "Employee"
+  }'
+
+EXPECTED RESPONSE (HTTP 201 Created):
+{
+  "id": 1,
+  "employee_code": "EMP0001",
+  "full_name": "John Doe",
+  "email": "john.doe@peoplepay360.com",
+  "department": "Engineering",
+  "job_position": "Software Engineer",
+  "working_schedule": 1,
+  "working_schedule_name": "Standard 40h Shift Template"
+}
+
+-------------------------------------------------------------------------------
+STEP 4: CREATE AN ACTIVE EMPLOYMENT CONTRACT
+-------------------------------------------------------------------------------
+FEATURE TESTED:
+Contract Management (/api/contracts/). Creates an active ('running') contract
+defining monthly base wage, start date, and job position.
+
+RUNNING COMMAND:
+curl -X POST http://127.0.0.1:8000/api/contracts/ \
+  -H "Authorization: Token ca9807b61fb9affe3ab6bf02fd6dcf529b73558e" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "employee": 1,
+    "wage": "85000.00",
+    "date_start": "2026-01-01",
+    "date_end": null,
+    "state": "running",
+    "department": "Engineering",
+    "job_position": "Software Engineer"
+  }'
+
+EXPECTED RESPONSE (HTTP 201 Created):
+{
+  "id": 1,
+  "employee": 1,
+  "employee_code": "EMP0001",
+  "employee_name": "John Doe",
+  "wage": "85000.00",
+  "date_start": "2026-01-01",
+  "date_end": null,
+  "state": "running"
+}
+
+-------------------------------------------------------------------------------
+STEP 5: TEST CONTRACT OVERLAP PREVENTION RULE (RETURNS HTTP 400)
+-------------------------------------------------------------------------------
+FEATURE TESTED:
+Active Contract Overlap Business Rule Validation. Verifies that attempting to create
+a second concurrent 'running' contract for the same employee is blocked by both the DRF
+serializer validation and model full_clean() logic.
+
+RUNNING COMMAND:
+curl -X POST http://127.0.0.1:8000/api/contracts/ \
+  -H "Authorization: Token ca9807b61fb9affe3ab6bf02fd6dcf529b73558e" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "employee": 1,
+    "wage": "95000.00",
+    "date_start": "2026-06-01",
+    "date_end": null,
+    "state": "running",
+    "department": "Engineering",
+    "job_position": "Senior Software Engineer"
+  }'
+
+EXPECTED RESPONSE (HTTP 400 Bad Request):
+{
+  "non_field_errors": [
+    "Employee John Doe already has an active ('running') contract during this timeframe."
+  ]
+}
+
+-------------------------------------------------------------------------------
+STEP 6: LIVE ATTENDANCE CHECK-IN
+-------------------------------------------------------------------------------
+FEATURE TESTED:
+Real-Time Employee Time Clock Check-In (/api/attendance/check-in/).
+Captures current server timestamp for check-in and prevents duplicate check-ins.
+
+RUNNING COMMAND (Option A - Live Check-In Endpoint):
+curl -X POST http://127.0.0.1:8000/api/attendance/check-in/ \
+  -H "Authorization: Token ca9807b61fb9affe3ab6bf02fd6dcf529b73558e" \
+  -H "Content-Type: application/json"
+
+RUNNING COMMAND (Option B - Manual / Admin Attendance Entry):
+curl -X POST http://127.0.0.1:8000/api/attendance/ \
+  -H "Authorization: Token ca9807b61fb9affe3ab6bf02fd6dcf529b73558e" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "employee": 1,
+    "check_in": "2026-09-01T09:00:00Z",
+    "check_out": "2026-09-01T17:00:00Z",
+    "status": "present"
+  }'
+
+EXPECTED RESPONSE (HTTP 201 Created):
+{
+  "id": 1,
+  "employee": 1,
+  "check_in": "2026-09-01T09:00:00Z",
+  "check_out": "2026-09-01T17:00:00Z",
+  "status": "present",
+  "worked_hours": 8.0,
+  "raw_hours": 8.0,
+  "is_manual_correction": false
+}
+
+-------------------------------------------------------------------------------
+STEP 7: LIVE ATTENDANCE CHECK-OUT
+-------------------------------------------------------------------------------
+FEATURE TESTED:
+Real-Time Employee Time Clock Check-Out (/api/attendance/check-out/).
+Finds open active check-in record for authenticated employee, sets check_out timestamp,
+and computes total worked hours.
+
+RUNNING COMMAND:
+curl -X POST http://127.0.0.1:8000/api/attendance/check-out/ \
+  -H "Authorization: Token ca9807b61fb9affe3ab6bf02fd6dcf529b73558e" \
+  -H "Content-Type: application/json"
+
+EXPECTED RESPONSE (HTTP 200 OK):
+{
+  "status": "success",
+  "message": "Check-out successful.",
+  "data": {
+    "id": 1,
+    "check_out": "2026-09-01T17:00:00Z",
+    "worked_hours": 8.0
+  }
+}
+
+-------------------------------------------------------------------------------
+STEP 8: TEST FORGOTTEN CHECK-OUT / OVERTIME SAFETY CAP (>14 HOURS)
+-------------------------------------------------------------------------------
+FEATURE TESTED:
+Automated Forgotten Check-Out Protection. If an employee forgets to check out
+and the shift duration exceeds 14 hours without prior approval, the system:
+1. Caps calculated 'worked_hours' at 12.0 hours for safety to prevent payroll inflation.
+2. Keeps exact actual duration in 'raw_hours' (e.g. 24.0h).
+3. Auto-populates notes requesting Manager approval.
+
+RUNNING COMMAND (24-Hour Shift: Mon 9:30 AM to Tue 9:30 AM):
+curl -X POST http://127.0.0.1:8000/api/attendance/ \
+  -H "Authorization: Token ca9807b61fb9affe3ab6bf02fd6dcf529b73558e" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "employee": 1,
+    "check_in": "2026-09-01T09:30:00Z",
+    "check_out": "2026-09-02T09:30:00Z",
+    "status": "present",
+    "is_manual_correction": false
+  }'
+
+EXPECTED RESPONSE (HTTP 201 Created):
+{
+  "id": 2,
+  "employee": 1,
+  "raw_hours": 24.0,
+  "worked_hours": 12.0,
+  "is_manual_correction": false,
+  "notes": "Auto-flagged: Check-out exceeded 14 hours (24.0h). Capped at 12h pending Manager overtime approval."
+}
+
+-------------------------------------------------------------------------------
+STEP 9: MANAGER / ADMIN OVERTIME & CORRECTION APPROVAL
+-------------------------------------------------------------------------------
+FEATURE TESTED:
+Manager Overtime Approval Workflow (/api/attendance/{id}/approve-correction/).
+HR Manager or Admin approves genuine overtime shift. Sets is_manual_correction = true,
+appends approval notes, and unlocks full uncapped worked_hours (24.0h).
+
+RUNNING COMMAND:
+curl -X POST http://127.0.0.1:8000/api/attendance/2/approve-correction/ \
+  -H "Authorization: Token ca9807b61fb9affe3ab6bf02fd6dcf529b73558e" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "notes": "Approved 24h extended emergency server maintenance shift"
+  }'
+
+EXPECTED RESPONSE (HTTP 200 OK):
+{
+  "status": "success",
+  "message": "Attendance correction and overtime approved successfully.",
+  "data": {
+    "id": 2,
+    "raw_hours": 24.0,
+    "worked_hours": 24.0,
+    "is_manual_correction": true,
+    "notes": "Auto-flagged: Check-out exceeded 14 hours...\nApproved by Manager: Approved 24h extended emergency server maintenance shift"
+  }
+}
+
+-------------------------------------------------------------------------------
+STEP 10: USER LOGOUT & TOKEN INVALIDATION
+-------------------------------------------------------------------------------
+FEATURE TESTED:
+Authentication Logout (/api/auth/logout/). Invalidates and deletes the active Auth Token.
+
+RUNNING COMMAND:
+curl -X POST http://127.0.0.1:8000/api/auth/logout/ \
+  -H "Authorization: Token ca9807b61fb9affe3ab6bf02fd6dcf529b73558e" \
+  -H "Content-Type: application/json"
+
+EXPECTED RESPONSE (HTTP 200 OK):
+{
+  "status": "success",
+  "message": "Successfully logged out.",
+  "data": {},
+  "errors": null
+}
+
+===============================================================================
