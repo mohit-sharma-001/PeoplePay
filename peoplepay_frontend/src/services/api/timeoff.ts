@@ -72,8 +72,13 @@ export const timeOffApi = {
     return { ...res, data };
   },
 
-  async getAllocationsByEmployee(employeeId?: string): Promise<ApiResponse<TimeOffAllocation[]>> {
-    const url = employeeId ? `/api/time-off/allocations/?employee=${employeeId}` : '/api/time-off/allocations/';
+  async getAllocationsByEmployee(employeeId?: string, timeOffTypeId?: string): Promise<ApiResponse<TimeOffAllocation[]>> {
+    let url = '/api/time-off/allocations/';
+    const params = new URLSearchParams();
+    if (employeeId) params.append('employee', employeeId);
+    if (timeOffTypeId) params.append('time_off_type', timeOffTypeId);
+    if (params.toString()) url += `?${params.toString()}`;
+
     const res = await apiFetch<any[]>(url, {}, mockTimeOffAllocations);
     const data = Array.isArray(res.data) ? res.data.map(mapTimeOffAllocation) : mockTimeOffAllocations;
     return { ...res, data };

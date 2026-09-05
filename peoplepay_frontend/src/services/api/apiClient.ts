@@ -42,7 +42,7 @@ export async function request<T = any>(
   };
 
   if (token && !headers['Authorization']) {
-    headers['Authorization'] = `Bearer ${token}`;
+    headers['Authorization'] = `Token ${token}`;
   }
 
   const url = endpoint.startsWith('http') ? endpoint : `${BASE_URL}${endpoint}`;

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Banknote, FileText, Layers, Award, Plus, ArrowRight } from 'lucide-react';
+import { Banknote, FileText, Layers, Award, Plus, ArrowRight, AlertCircle } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -33,6 +33,10 @@ export const PayrollDashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-3 shadow-xs">
+        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+        <span>Demo data — backend not yet connected</span>
+      </div>
       <PageHeader
         title="Payroll Management"
         subtitle="Process monthly payruns, calculate salary structures, generate payslips, and review rules."

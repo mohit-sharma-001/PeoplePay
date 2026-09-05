@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, ExternalLink } from 'lucide-react';
+import { FileText, ExternalLink, AlertCircle } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { DataTable, Column } from '../../components/shared/DataTable';
 import { SearchInput } from '../../components/shared/SearchInput';
@@ -78,6 +78,10 @@ export const PayslipsListPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-3 shadow-xs">
+        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+        <span>Demo data — backend not yet connected</span>
+      </div>
       <PageHeader
         title="Employee Payslips"
         subtitle="View and download individual computed salary slips and deduction itemizations."

@@ -52,7 +52,7 @@ export const TimeOffTypesPage: React.FC = () => {
             <CardContent className="space-y-3 text-xs">
               <div className="flex justify-between border-b border-slate-100 pb-2">
                 <span className="text-slate-500 font-medium">Requires Approval</span>
-                <span className="font-semibold text-slate-900">{type.requiresApproval ? 'Yes (Manager)' : 'No (Auto)'}</span>
+                <span className="font-semibold text-slate-900">{type.requiresApproval ? 'Yes (Manager & Admin)' : 'No (Auto)'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500 font-medium">Allocation Mode</span>

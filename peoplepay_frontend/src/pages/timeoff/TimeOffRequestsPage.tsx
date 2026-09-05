@@ -17,6 +17,9 @@ import { formatDate } from '../../utils/formatters';
 
 export const TimeOffRequestsPage: React.FC = () => {
   const { user } = useAuth();
+  const userEmployeeId = user?.employee_id ? String(user.employee_id) : null;
+  const hasEmployeeProfile = Boolean(userEmployeeId);
+
   const [requests, setRequests] = useState<TimeOffRequest[]>([]);
   const [types, setTypes] = useState<TimeOffType[]>([]);
   const [allocations, setAllocations] = useState<TimeOffAllocation[]>([]);
@@ -38,21 +41,15 @@ export const TimeOffRequestsPage: React.FC = () => {
 
   const loadData = async () => {
     setIsLoading(true);
-    const empId = user?.employee_id ? String(user.employee_id) : undefined;
-    const [reqRes, typRes, alcRes] = await Promise.all([
+    const [reqRes, typRes] = await Promise.all([
       timeOffApi.getRequests(),
       timeOffApi.getTypes(),
-      timeOffApi.getAllocationsByEmployee(empId),
     ]);
     setRequests(reqRes.data || []);
     setTypes(typRes.data || []);
-    setAllocations(alcRes.data || []);
 
     if (typRes.data && typRes.data.length > 0 && !timeOffTypeId) {
       setTimeOffTypeId(typRes.data[0].id);
-    }
-    if (alcRes.data && alcRes.data.length > 0 && !allocationId) {
-      setAllocationId(alcRes.data[0].id);
     }
     setIsLoading(false);
   };
@@ -61,9 +58,29 @@ export const TimeOffRequestsPage: React.FC = () => {
     loadData();
   }, [user]);
 
+  // Auto-detect active allocation for the logged-in user's employee_id and selected leave type
+  useEffect(() => {
+    async function updateAllocations() {
+      if (!userEmployeeId) {
+        setAllocations([]);
+        setAllocationId('');
+        return;
+      }
+      const res = await timeOffApi.getAllocationsByEmployee(userEmployeeId, timeOffTypeId || undefined);
+      const fetchedAllocations = res.data || [];
+      setAllocations(fetchedAllocations);
+
+      if (fetchedAllocations.length > 0) {
+        setAllocationId(fetchedAllocations[0].id);
+      } else {
+        setAllocationId('');
+      }
+    }
+    updateAllocations();
+  }, [userEmployeeId, timeOffTypeId]);
+
   const resetForm = () => {
     if (types.length > 0) setTimeOffTypeId(types[0].id);
-    if (allocations.length > 0) setAllocationId(allocations[0].id);
     setDateFrom(new Date().toISOString().split('T')[0]);
     setDateTo(new Date().toISOString().split('T')[0]);
     setReason('');
@@ -73,27 +90,40 @@ export const TimeOffRequestsPage: React.FC = () => {
 
   const handleCreateRequest = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!userEmployeeId) {
+      setGlobalError('Your user account is not linked to an employee profile.');
+      return;
+    }
     if (!timeOffTypeId) {
       setGlobalError('Please select a time off type.');
       return;
     }
+
+    const selectedType = types.find((t) => String(t.id) === String(timeOffTypeId));
+    if (selectedType && selectedType.allocationMode === 'Fixed' && !allocationId) {
+      setGlobalError(`Time off type '${selectedType.name}' requires an active confirmed leave allocation, but none was found for your account.`);
+      return;
+    }
+
+    if (!reason.trim()) {
+      setGlobalError('Please specify a reason for taking time off.');
+      return;
+    }
+
     setSubmitting(true);
     setGlobalError(null);
     setSplitWarning(null);
 
     const payload: any = {
+      employee: parseInt(userEmployeeId, 10),
       time_off_type: parseInt(timeOffTypeId, 10),
       date_from: dateFrom,
       date_to: dateTo,
       reason: reason.trim(),
     };
-    if (user?.employee_id) {
-      payload.employee = parseInt(String(user.employee_id), 10);
-    }
     if (allocationId) {
       payload.allocation = parseInt(allocationId, 10);
     }
-
 
     try {
       const res = await timeOffApi.createRequest(payload);
@@ -160,14 +190,13 @@ export const TimeOffRequestsPage: React.FC = () => {
       (r.timeOffTypeName || '').toLowerCase().includes(search.toLowerCase())
   );
 
-  const typeOptions = types.map((t) => ({ value: t.id, label: t.name }));
-  const allocationOptions = [
-    { value: '', label: 'Auto-detect active allocation' },
-    ...allocations.map((a) => ({
-      value: a.id,
-      label: `${a.timeOffTypeName} (${a.remainingDays} days remaining)`,
-    })),
-  ];
+  const typeOptions = types.map((t) => ({ value: String(t.id), label: t.name }));
+  const allocationOptions = allocations.length > 0
+    ? allocations.map((a) => ({
+        value: String(a.id),
+        label: `${a.timeOffTypeName} (${a.remainingDays} days remaining)`,
+      }))
+    : [{ value: '', label: 'No active allocation for this leave type' }];
 
   const columns: Column<TimeOffRequest>[] = [
     {
@@ -226,6 +255,14 @@ export const TimeOffRequestsPage: React.FC = () => {
         </div>
       )}
 
+      {/* Info Banner for Accounts Without Employee Profiles */}
+      {!hasEmployeeProfile && (
+        <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 text-xs font-medium flex items-center gap-2.5">
+          <AlertCircle className="w-4 h-4 text-slate-400 shrink-0" />
+          <span>This account has no employee profile linked — time off creation is only available for employee accounts.</span>
+        </div>
+      )}
+
       <PageHeader
         title="Time Off Requests"
         subtitle="Review, approve, or refuse employee leave applications."
@@ -234,9 +271,11 @@ export const TimeOffRequestsPage: React.FC = () => {
           { label: 'Requests' },
         ]}
         actions={
-          <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setIsModalOpen(true)}>
-            Create Request
-          </Button>
+          hasEmployeeProfile ? (
+            <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setIsModalOpen(true)}>
+              Create Request
+            </Button>
+          ) : undefined
         }
       />
 
@@ -325,7 +364,7 @@ export const TimeOffRequestsPage: React.FC = () => {
                   required
                 />
                 <Select
-                  label="Allocation Balance"
+                  label="Allocation Balance *"
                   options={allocationOptions}
                   value={allocationId}
                   onChange={(e) => setAllocationId(e.target.value)}

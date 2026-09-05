@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Banknote, FileText, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Banknote, FileText, ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { StatusBadge } from '../../components/shared/StatusBadge';
@@ -89,6 +89,10 @@ export const PayrunDetailsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-3 shadow-xs">
+        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+        <span>Demo data — backend not yet connected</span>
+      </div>
       <PageHeader
         title={`Payrun: ${payrun.reference}`}
         subtitle={payrun.name}

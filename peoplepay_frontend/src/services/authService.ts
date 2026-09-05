@@ -1,5 +1,4 @@
 import { User, Role, RegisterPayload, RegisterResponse, ManagedUser } from '../types/auth';
-import { mockUsers } from '../data/mockUsers';
 import { request, setAuthToken, setStoredUser, getStoredUser, getAuthToken } from './api/apiClient';
 
 export interface LoginCredentials {
@@ -13,15 +12,6 @@ export interface AuthResponse {
   token?: string;
   error?: string;
 }
-
-let inMemoryUsers: ManagedUser[] = mockUsers.map((u, idx) => ({
-  id: idx + 1,
-  username: u.email.split('@')[0],
-  email: u.email,
-  roles: [u.role],
-  employee_id: idx + 10,
-  employee_name: u.name,
-}));
 
 export const authService = {
   login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
@@ -68,7 +58,7 @@ export const authService = {
           employee_id: rawUser.employee_id,
         };
 
-        setAuthToken(token || `token_${Date.now()}`);
+        setAuthToken(token);
         setStoredUser(userObj);
 
         return {
@@ -79,38 +69,9 @@ export const authService = {
       }
     }
 
-    // Fallback mock authentication if backend API server is offline/unreachable
-    const matchedUser = mockUsers.find(
-      (u) =>
-        u.email.toLowerCase() === identifier.toLowerCase() ||
-        u.name.toLowerCase().includes(identifier.toLowerCase()) ||
-        String(u.id).toLowerCase() === identifier.toLowerCase()
-    ) || {
-      id: `usr-${Date.now()}`,
-      name: identifier.includes('@') ? identifier.split('@')[0] : identifier,
-      email: identifier.includes('@') ? identifier : `${identifier}@peoplepay360.io`,
-      role: 'Employee' as Role,
-      roles: ['Employee'],
-      department: 'Engineering',
-      employeeId: 'EMP-DEMO-001',
-    };
-
-    const rolesList = matchedUser.roles || [matchedUser.role];
-
-    const finalUser: User = {
-      ...matchedUser,
-      roles: rolesList,
-      role: (rolesList[0] as Role) || matchedUser.role,
-    };
-
-    const token = `mock_token_${Date.now()}`;
-    setAuthToken(token);
-    setStoredUser(finalUser);
-
     return {
-      success: true,
-      user: finalUser,
-      token,
+      success: false,
+      error: apiRes.errorMsg || 'Invalid username or password.',
     };
   },
 
@@ -154,16 +115,6 @@ export const authService = {
 
         setAuthToken(token);
         setStoredUser(userObj);
-
-        // Add to local list for fallback testing
-        inMemoryUsers.push({
-          id: rawUser.id,
-          username: rawUser.username || payload.username,
-          email: rawUser.email || payload.email,
-          roles: ['Employee'],
-          employee_id: rawUser.employee_id || Date.now(),
-          employee_name: `${payload.first_name} ${payload.last_name}`,
-        });
       }
 
       return {
@@ -173,58 +124,10 @@ export const authService = {
       };
     }
 
-    if (apiRes.status === 400 && apiRes.data?.errors) {
-      return {
-        success: false,
-        message: apiRes.data.message || 'Registration failed.',
-        errors: apiRes.data.errors,
-      };
-    }
-
-    // Fallback registration handling for offline testing
-    const newId = Date.now();
-    const newManagedUser: ManagedUser = {
-      id: newId,
-      username: payload.username,
-      email: payload.email,
-      roles: ['Employee'],
-      employee_id: newId + 5,
-      employee_name: `${payload.first_name} ${payload.last_name}`,
-    };
-    inMemoryUsers.push(newManagedUser);
-
-    const newUserObj: User = {
-      id: newId,
-      name: `${payload.first_name} ${payload.last_name}`,
-      username: payload.username,
-      email: payload.email,
-      first_name: payload.first_name,
-      last_name: payload.last_name,
-      role: 'Employee',
-      roles: ['Employee'],
-      employee_id: newId + 5,
-      employeeId: `EMP-${newId + 5}`,
-    };
-
-    const token = `reg_token_${newId}`;
-    setAuthToken(token);
-    setStoredUser(newUserObj);
-
     return {
-      success: true,
-      message: 'Registration successful.',
-      data: {
-        token,
-        user: {
-          id: newId,
-          username: payload.username,
-          email: payload.email,
-          first_name: payload.first_name,
-          last_name: payload.last_name,
-          roles: ['Employee'],
-          employee_id: newId + 5,
-        },
-      },
+      success: false,
+      message: apiRes.errorMsg || 'Registration failed.',
+      errors: apiRes.data?.errors,
     };
   },
 
@@ -245,12 +148,7 @@ export const authService = {
       return { success: true, data: list };
     }
 
-    // Offline fallback using inMemoryUsers
-    let list = [...inMemoryUsers];
-    if (roleFilter) {
-      list = list.filter((u) => u.roles && u.roles.includes(roleFilter));
-    }
-    return { success: true, data: list };
+    return { success: false, data: [], error: apiRes.errorMsg || 'Failed to fetch user list.' };
   },
 
   assignRole: async (userId: number | string, newRole: string): Promise<{ success: boolean; data?: any; error?: string }> => {
@@ -275,31 +173,6 @@ export const authService = {
       }
 
       return { success: true, data: updated };
-    }
-
-    // Offline fallback for testing
-    const found = inMemoryUsers.find((u) => String(u.id) === String(userId));
-    if (found) {
-      found.roles = [newRole];
-
-      const currentUser = getStoredUser();
-      if (currentUser && String(currentUser.id) === String(userId)) {
-        const updatedSelf = {
-          ...currentUser,
-          roles: [newRole],
-          role: newRole as Role,
-        };
-        setStoredUser(updatedSelf);
-      }
-
-      return {
-        success: true,
-        data: {
-          id: userId,
-          username: found.username,
-          roles: [newRole],
-        },
-      };
     }
 
     return { success: false, error: apiRes.errorMsg || 'Failed to assign role.' };
