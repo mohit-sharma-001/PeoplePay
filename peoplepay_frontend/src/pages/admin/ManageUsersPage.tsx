@@ -31,6 +31,8 @@ export const ManageUsersPage: React.FC = () => {
 
   const availableRoles: Role[] = ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User', 'Employee'];
 
+  const [totalUserCount, setTotalUserCount] = useState<number>(0);
+
   useEffect(() => {
     if (!isAdmin) {
       navigate('/dashboard', { replace: true });
@@ -43,9 +45,15 @@ export const ManageUsersPage: React.FC = () => {
     setIsLoading(true);
     try {
       const filter = activeTab === 'unassigned' ? 'Employee' : undefined;
-      const res = await authService.getUsers(filter);
+      const [res, allRes] = await Promise.all([
+        authService.getUsers(filter),
+        authService.getUsers(),
+      ]);
       if (res.success) {
         setUsers(res.data);
+      }
+      if (allRes.success) {
+        setTotalUserCount(allRes.data.length);
       }
     } catch (err) {
       console.error('Failed to fetch users:', err);
@@ -209,7 +217,7 @@ export const ManageUsersPage: React.FC = () => {
                 : 'bg-[var(--bg-surface-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
-            All System Users ({users.length})
+            All System Users ({totalUserCount})
           </button>
           <button
             type="button"

@@ -14,19 +14,18 @@ from time_off.serializers import (
 class TimeOffTypeViewSet(viewsets.ModelViewSet):
     """
     ModelViewSet for managing leave categories/types.
-    Read allowed for all roles; create/update/destroy restricted to Admin and HR Manager.
     """
     queryset = TimeOffType.objects.all().order_by('name')
     serializer_class = TimeOffTypeSerializer
     permission_classes = [permissions.IsAuthenticated, HasRole]
     action_allowed_roles = {
-        'list': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User', 'Employee'],
-        'retrieve': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User', 'Employee'],
-        'create': ['Admin', 'HR Manager', 'HR Payroll User'],
-        'update': ['Admin', 'HR Manager', 'HR Payroll User'],
-        'partial_update': ['Admin', 'HR Manager', 'HR Payroll User'],
-        'destroy': ['Admin', 'HR Manager', 'HR Payroll User'],
-        'bulk_allocate': ['Admin', 'HR Manager', 'HR Payroll User'],
+        'list': ['Admin', 'HR Payroll Manager', 'HR Payroll User', 'HR Manager', 'Employee'],
+        'retrieve': ['Admin', 'HR Payroll Manager', 'HR Payroll User', 'HR Manager', 'Employee'],
+        'create': ['Admin', 'HR Payroll Manager', 'HR Manager'],
+        'update': ['Admin', 'HR Payroll Manager', 'HR Manager'],
+        'partial_update': ['Admin', 'HR Payroll Manager', 'HR Manager'],
+        'destroy': ['Admin', 'HR Payroll Manager', 'HR Manager'],
+        'bulk_allocate': ['Admin', 'HR Payroll Manager', 'HR Manager'],
     }
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['name']
@@ -96,18 +95,17 @@ class TimeOffTypeViewSet(viewsets.ModelViewSet):
 class TimeOffAllocationViewSet(viewsets.ModelViewSet):
     """
     ModelViewSet for managing leave allocations granted to employees.
-    Read allowed for all roles (filtered for Employee role); create/update/destroy restricted to Admin and HR Manager.
     """
     queryset = TimeOffAllocation.objects.all().select_related('employee', 'time_off_type').order_by('-valid_from')
     serializer_class = TimeOffAllocationSerializer
     permission_classes = [permissions.IsAuthenticated, HasRole]
     action_allowed_roles = {
-        'list': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User', 'Employee'],
-        'retrieve': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User', 'Employee'],
-        'create': ['Admin', 'HR Manager', 'HR Payroll User'],
-        'update': ['Admin', 'HR Manager', 'HR Payroll User'],
-        'partial_update': ['Admin', 'HR Manager', 'HR Payroll User'],
-        'destroy': ['Admin', 'HR Manager', 'HR Payroll User'],
+        'list': ['Admin', 'HR Payroll Manager', 'HR Payroll User', 'HR Manager', 'Employee'],
+        'retrieve': ['Admin', 'HR Payroll Manager', 'HR Payroll User', 'HR Manager', 'Employee'],
+        'create': ['Admin', 'HR Payroll Manager', 'HR Manager'],
+        'update': ['Admin', 'HR Payroll Manager', 'HR Manager'],
+        'partial_update': ['Admin', 'HR Payroll Manager', 'HR Manager'],
+        'destroy': ['Admin', 'HR Payroll Manager', 'HR Manager'],
     }
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['employee__first_name', 'employee__last_name', 'employee__employee_code', 'time_off_type__name']
@@ -140,8 +138,6 @@ class TimeOffAllocationViewSet(viewsets.ModelViewSet):
 class TimeOffRequestViewSet(viewsets.ModelViewSet):
     """
     ModelViewSet for managing time off requests.
-    Any authenticated user can create requests; approve/refuse restricted to Admin and HR Manager.
-    Filters queryset for Employee role to see only their own requests.
     """
     queryset = TimeOffRequest.objects.all().select_related(
         'employee', 'time_off_type', 'allocation', 'approved_by', 'overflow_unpaid_request'
@@ -149,14 +145,14 @@ class TimeOffRequestViewSet(viewsets.ModelViewSet):
     serializer_class = TimeOffRequestSerializer
     permission_classes = [permissions.IsAuthenticated, HasRole]
     action_allowed_roles = {
-        'list': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User', 'Employee'],
-        'retrieve': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User', 'Employee'],
-        'create': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User', 'Employee'],
-        'approve': ['Admin', 'HR Manager', 'HR Payroll User'],
-        'refuse': ['Admin', 'HR Manager', 'HR Payroll User'],
-        'update': ['Admin', 'HR Manager', 'HR Payroll User'],
-        'partial_update': ['Admin', 'HR Manager', 'HR Payroll User'],
-        'destroy': ['Admin', 'HR Manager', 'HR Payroll User'],
+        'list': ['Admin', 'HR Payroll Manager', 'HR Payroll User', 'HR Manager', 'Employee'],
+        'retrieve': ['Admin', 'HR Payroll Manager', 'HR Payroll User', 'HR Manager', 'Employee'],
+        'create': ['Admin', 'HR Payroll Manager', 'HR Payroll User', 'HR Manager', 'Employee'],
+        'approve': ['Admin', 'HR Payroll Manager', 'HR Manager'],
+        'refuse': ['Admin', 'HR Payroll Manager', 'HR Manager'],
+        'update': ['Admin', 'HR Payroll Manager', 'HR Manager'],
+        'partial_update': ['Admin', 'HR Payroll Manager', 'HR Manager'],
+        'destroy': ['Admin', 'HR Payroll Manager', 'HR Manager'],
     }
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['employee__first_name', 'employee__last_name', 'employee__employee_code', 'time_off_type__name', 'reason']

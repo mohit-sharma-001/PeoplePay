@@ -338,5 +338,40 @@ class EmployeeAPITestCase(TestCase):
         res_hr_react = self.client.post(f'/api/employees/{self.employee.id}/reactivate/', {}, format='json')
         self.assertEqual(res_hr_react.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_admin_hard_delete_cascades_user(self):
+        # Non-admin cannot hard delete
+        hr_user = User.objects.create_user(username='hr_mgr_del', password='Password123!')
+        hr_user.groups.add(self.hr_group)
+        self.client.force_authenticate(user=hr_user)
+        res_del_hr = self.client.delete(f'/api/employees/{self.employee.id}/')
+        self.assertEqual(res_del_hr.status_code, status.HTTP_403_FORBIDDEN)
+
+        # Admin can hard delete
+        linked_user_id = self.employee.user.id
+        self.client.force_authenticate(user=self.user)
+        res_del_admin = self.client.delete(f'/api/employees/{self.employee.id}/')
+        self.assertEqual(res_del_admin.status_code, status.HTTP_204_NO_CONTENT)
+
+        self.assertFalse(Employee.objects.filter(id=self.employee.id).exists())
+        self.assertFalse(User.objects.filter(id=linked_user_id).exists())
+
+    def test_termination_cancels_pending_timeoff_requests(self):
+        from time_off.models import TimeOffType, TimeOffRequest
+        tt = TimeOffType.objects.create(name='Casual Leave', requires_allocation=False)
+        req = TimeOffRequest.objects.create(
+            employee=self.employee,
+            time_off_type=tt,
+            date_from=date(2026, 7, 1),
+            date_to=date(2026, 7, 2),
+            status=TimeOffRequest.Status.SUBMITTED
+        )
+
+        self.client.force_authenticate(user=self.user)
+        res = self.client.post(f'/api/employees/{self.employee.id}/terminate/', {'reason': 'Resigned'}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+        req.refresh_from_db()
+        self.assertEqual(req.status, TimeOffRequest.Status.CANCELLED)
+
 
 

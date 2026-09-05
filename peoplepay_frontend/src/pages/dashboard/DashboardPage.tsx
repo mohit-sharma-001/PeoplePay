@@ -107,10 +107,10 @@ export const DashboardPage: React.FC = () => {
             <CardContent className="p-5 flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Pending Leave Req.</p>
-                <h2 className="text-2xl font-black text-[#F59E0B] mt-1">{isLoading ? '...' : pendingTimeOff}</h2>
-                <span className="text-xs text-[#D97706] font-semibold mt-0.5 inline-block">Awaiting approval</span>
+                <h2 className="text-2xl font-black text-amber-700 dark:text-amber-400 mt-1">{isLoading ? '...' : pendingTimeOff}</h2>
+                <span className="text-xs text-amber-800 dark:text-amber-300 font-bold mt-0.5 inline-block">Awaiting approval</span>
               </div>
-              <div className="p-3 bg-[#F59E0B]/10 text-[#F59E0B] rounded-xl">
+              <div className="p-3 bg-amber-500/15 text-amber-700 dark:text-amber-300 rounded-xl">
                 <Calendar className="w-6 h-6" />
               </div>
             </CardContent>

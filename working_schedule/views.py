@@ -14,12 +14,12 @@ class WorkingScheduleViewSet(viewsets.ModelViewSet):
     serializer_class = WorkingScheduleSerializer
     permission_classes = [permissions.IsAuthenticated, HasRole]
     action_allowed_roles = {
-        'list': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User'],
-        'retrieve': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User'],
-        'create': ['Admin', 'HR Manager', 'HR Payroll User'],
-        'update': ['Admin', 'HR Manager', 'HR Payroll User'],
-        'partial_update': ['Admin', 'HR Manager', 'HR Payroll User'],
-        'destroy': ['Admin', 'HR Manager', 'HR Payroll User'],
+        'list': ['Admin', 'HR Payroll Manager', 'HR Payroll User', 'HR Manager'],
+        'retrieve': ['Admin', 'HR Payroll Manager', 'HR Payroll User', 'HR Manager'],
+        'create': ['Admin', 'HR Payroll Manager', 'HR Manager'],
+        'update': ['Admin', 'HR Payroll Manager', 'HR Manager'],
+        'partial_update': ['Admin', 'HR Payroll Manager', 'HR Manager'],
+        'destroy': ['Admin', 'HR Payroll Manager', 'HR Manager'],
     }
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['name', 'company_name']

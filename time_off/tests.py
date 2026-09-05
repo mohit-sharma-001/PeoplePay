@@ -188,11 +188,11 @@ class TimeOffModuleTestCase(TestCase):
         res = self.client.post('/api/time-off/types/', {'name': 'Illegal Type'}, format='json')
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_hr_payroll_manager_cannot_approve_or_refuse_request_returns_403(self):
-        payroll_mgr_group, _ = Group.objects.get_or_create(name='HR Payroll Manager')
-        pm_user = User.objects.create_user(username='hr_pm_user', password='Password123!')
-        pm_user.groups.add(payroll_mgr_group)
-        self.client.force_authenticate(user=pm_user)
+    def test_hr_payroll_user_cannot_approve_or_refuse_request_returns_403(self):
+        payroll_user_group, _ = Group.objects.get_or_create(name='HR Payroll User')
+        pu_user = User.objects.create_user(username='hr_pu_user', password='Password123!')
+        pu_user.groups.add(payroll_user_group)
+        self.client.force_authenticate(user=pu_user)
 
         req = TimeOffRequest.objects.create(
             employee=self.employee,

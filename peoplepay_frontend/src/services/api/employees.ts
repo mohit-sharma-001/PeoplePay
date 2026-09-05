@@ -117,5 +117,11 @@ export const employeesApi = {
     });
     return { ...res, data: res.data ? mapEmployee(res.data) : (null as any) };
   },
+
+  async delete(id: string): Promise<ApiResponse<null>> {
+    return await apiFetch<null>(`/api/employees/${id}/`, {
+      method: 'DELETE',
+    });
+  },
 };
 

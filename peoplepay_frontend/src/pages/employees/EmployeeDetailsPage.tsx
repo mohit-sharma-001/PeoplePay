@@ -141,10 +141,40 @@ export const EmployeeDetailsPage: React.FC = () => {
   const [isReactivating, setIsReactivating] = useState(false);
   const [reactivateError, setReactivateError] = useState<string | null>(null);
 
+  // Hard Delete Modal State (Admin only)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   const isAdmin = Boolean(
     currentUser?.roles?.some((r) => r === 'Admin') ||
     currentUser?.role === 'Admin'
   );
+
+  const handleOpenDeleteModal = () => {
+    setDeleteError(null);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleDeleteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!employee || !id) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await employeesApi.delete(id);
+      if ((res.status && res.status >= 200 && res.status < 300) || !res.errors) {
+        setIsDeleteModalOpen(false);
+        navigate('/employees');
+      } else {
+        setDeleteError(res.message || 'Failed to delete employee.');
+      }
+    } catch (err: any) {
+      setDeleteError(err.message || 'An error occurred during deletion.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleOpenTerminateModal = () => {
     setTerminationReason('');
@@ -509,6 +539,17 @@ export const EmployeeDetailsPage: React.FC = () => {
               >
                 <UserCheck className="w-4 h-4 text-emerald-600" />
                 Reactivate
+              </Button>
+            )}
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleOpenDeleteModal}
+                className="border-red-600 text-red-600 hover:bg-red-50 hover:border-red-700 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+              >
+                <UserX className="w-4 h-4 text-red-600" />
+                Delete Permanently
               </Button>
             )}
             <Button variant="outline" size="sm" onClick={() => navigate('/contracts')}>
@@ -1193,6 +1234,53 @@ export const EmployeeDetailsPage: React.FC = () => {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Permanent Delete Modal (Admin Only) */}
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          if (!isDeleting) setIsDeleteModalOpen(false);
+        }}
+        title="Permanently Delete Employee"
+        description="Warning: This action is irreversible and cascades all data."
+        maxWidth="md"
+        footer={
+          <>
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteModalOpen(false)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleDeleteSubmit}
+              disabled={isDeleting}
+              leftIcon={isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : undefined}
+            >
+              {isDeleting ? 'Deleting...' : 'Delete Permanently'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4 py-2 text-xs">
+          <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 leading-relaxed flex items-start gap-2.5">
+            <AlertOctagon className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold mb-1">Irreversible Data Loss Warning</p>
+              <p>
+                Deleting <strong>{employee?.firstName} {employee?.lastName}</strong> will permanently remove their profile, linked user login account, contracts, attendance logs, time-off requests, and payslips from the system.
+              </p>
+            </div>
+          </div>
+          {deleteError && (
+            <div className="p-3 bg-red-100 text-red-800 rounded-lg font-medium">
+              {deleteError}
+            </div>
+          )}
+        </div>
       </Modal>
     </div>
   );

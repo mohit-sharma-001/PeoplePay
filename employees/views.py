@@ -19,20 +19,28 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     serializer_class = EmployeeSerializer
     permission_classes = [permissions.IsAuthenticated, HasRole]
     action_allowed_roles = {
-        'list': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User', 'Employee'],
-        'retrieve': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User', 'Employee'],
-        'create': ['Admin', 'HR Manager', 'HR Payroll User'],
-        'update': ['Admin', 'HR Manager', 'HR Payroll User'],
-        'partial_update': ['Admin', 'HR Manager', 'HR Payroll User'],
-        'destroy': ['Admin', 'HR Manager', 'HR Payroll User'],
-        'create_login': ['Admin', 'HR Manager', 'HR Payroll User'],
-        'terminate': ['Admin', 'HR Manager', 'HR Payroll User'],
+        'list': ['Admin', 'HR Payroll Manager', 'HR Payroll User', 'HR Manager', 'Employee'],
+        'retrieve': ['Admin', 'HR Payroll Manager', 'HR Payroll User', 'HR Manager', 'Employee'],
+        'create': ['Admin', 'HR Payroll Manager', 'HR Manager'],
+        'update': ['Admin', 'HR Payroll Manager', 'HR Manager'],
+        'partial_update': ['Admin', 'HR Payroll Manager', 'HR Manager'],
+        'destroy': ['Admin'],
+        'create_login': ['Admin', 'HR Payroll Manager', 'HR Manager'],
+        'terminate': ['Admin', 'HR Payroll Manager', 'HR Manager'],
         'reactivate': ['Admin'],
     }
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['first_name', 'last_name', 'employee_code', 'email', 'job_position']
     ordering_fields = ['employee_code', 'date_joined', 'first_name', 'last_name']
     ordering = ['employee_code']
+
+    def destroy(self, request, *args, **kwargs):
+        employee = self.get_object()
+        linked_user = employee.user
+        response = super().destroy(request, *args, **kwargs)
+        if linked_user:
+            linked_user.delete()
+        return response
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -166,6 +174,13 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         if employee.user:
             employee.user.is_active = False
             employee.user.save(update_fields=['is_active'])
+
+        # Cancel pending time-off requests
+        from time_off.models import TimeOffRequest
+        TimeOffRequest.objects.filter(
+            employee=employee,
+            status=TimeOffRequest.Status.SUBMITTED
+        ).update(status=TimeOffRequest.Status.CANCELLED)
 
         serializer = self.get_serializer(employee)
         return Response(serializer.data, status=status.HTTP_200_OK)

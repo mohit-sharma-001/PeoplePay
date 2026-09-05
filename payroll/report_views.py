@@ -26,7 +26,7 @@ class PassthroughCSVRenderer(BaseRenderer):
         return data
 
 
-ALLOWED_REPORT_ROLES = {'Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User'}
+ALLOWED_REPORT_ROLES = {'Admin', 'HR Payroll Manager', 'HR Payroll User'}
 
 
 def check_report_permission(user):

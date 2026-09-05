@@ -299,11 +299,11 @@ export const ReportsPage: React.FC = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <CardTitle className="text-base">Time Off Balances & Leave Liability Valuation</CardTitle>
-                <p className="text-xs text-slate-500">Approximation based on contract daily rate (wage / 30.0)</p>
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5">Approximation based on contract daily rate (wage / 30.0)</p>
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="px-3 py-1.5 bg-purple-50 border border-purple-200 rounded-lg text-xs font-bold text-purple-900">
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="px-3.5 py-1.5 bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 rounded-lg text-xs font-bold text-purple-900 dark:text-purple-300 shrink-0">
                   Total Liability: ₹{liabilityData.total_liability.toLocaleString()}
                 </div>
                 <Button
@@ -311,6 +311,7 @@ export const ReportsPage: React.FC = () => {
                   variant="outline"
                   leftIcon={<Download className="w-4 h-4" />}
                   onClick={handleDownloadLiabilityCsv}
+                  className="shrink-0"
                 >
                   Export CSV
                 </Button>
@@ -319,14 +320,14 @@ export const ReportsPage: React.FC = () => {
 
             {/* Leave Utilization Trend Pills */}
             {liabilityData.utilization_trend && liabilityData.utilization_trend.length > 0 && (
-              <div className="pt-2 flex items-center gap-2 flex-wrap text-xs">
-                <span className="font-semibold text-slate-600 flex items-center gap-1">
-                  <TrendingUp className="w-3.5 h-3.5 text-blue-600" />
+              <div className="mt-3 pt-3 border-t border-[var(--border-color)] flex items-center gap-2 flex-wrap text-xs">
+                <span className="font-semibold text-[var(--text-secondary)] flex items-center gap-1.5">
+                  <TrendingUp className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                   Leave Request Utilization Trend (Last 3 Months):
                 </span>
                 {liabilityData.utilization_trend.map((trend) => (
-                  <Badge key={trend.month} variant="blue" className="font-mono text-xs">
-                    <Calendar className="w-3 h-3 mr-1" />
+                  <Badge key={trend.month} variant="blue" className="font-mono text-xs flex items-center gap-1">
+                    <Calendar className="w-3 h-3" />
                     {trend.month}: {trend.approved_requests} approved
                   </Badge>
                 ))}

@@ -23,14 +23,14 @@ class SalaryStructureViewSet(viewsets.ModelViewSet):
     """
     ModelViewSet for full CRUD management of Salary Structures.
     Full CRUD restricted to Admin and HR Payroll Manager.
-    Read-only (GET) additionally allowed for HR Manager and HR Payroll User.
+    Read-only (GET) additionally allowed for HR Payroll User.
     """
     queryset = SalaryStructure.objects.all().prefetch_related('rules').order_by('name')
     serializer_class = SalaryStructureSerializer
     permission_classes = [permissions.IsAuthenticated, HasRole]
     action_allowed_roles = {
-        'list': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User'],
-        'retrieve': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User'],
+        'list': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
+        'retrieve': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
         'create': ['Admin', 'HR Payroll Manager'],
         'update': ['Admin', 'HR Payroll Manager'],
         'partial_update': ['Admin', 'HR Payroll Manager'],
@@ -45,14 +45,14 @@ class SalaryRuleViewSet(viewsets.ModelViewSet):
     """
     ModelViewSet for full CRUD management of Salary Rules.
     Full CRUD restricted to Admin and HR Payroll Manager.
-    Read-only (GET) additionally allowed for HR Manager and HR Payroll User.
+    Read-only (GET) additionally allowed for HR Payroll User.
     """
     queryset = SalaryRule.objects.all().select_related('structure').order_by('sequence', 'id')
     serializer_class = SalaryRuleSerializer
     permission_classes = [permissions.IsAuthenticated, HasRole]
     action_allowed_roles = {
-        'list': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User'],
-        'retrieve': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User'],
+        'list': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
+        'retrieve': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
         'create': ['Admin', 'HR Payroll Manager'],
         'update': ['Admin', 'HR Payroll Manager'],
         'partial_update': ['Admin', 'HR Payroll Manager'],
@@ -83,8 +83,8 @@ class PayrunViewSet(viewsets.ModelViewSet):
     serializer_class = PayrunSerializer
     permission_classes = [permissions.IsAuthenticated, HasRole]
     action_allowed_roles = {
-        'list': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User'],
-        'retrieve': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User'],
+        'list': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
+        'retrieve': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
         'create': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
         'update': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
         'partial_update': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
@@ -299,11 +299,11 @@ class PayslipViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = PayslipSerializer
     permission_classes = [permissions.IsAuthenticated, HasRole]
     action_allowed_roles = {
-        'list': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User'],
-        'retrieve': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User'],
+        'list': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
+        'retrieve': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
         'add_adjustment': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
         'delete_adjustment': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
-        'pdf': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User'],
+        'pdf': ['Admin', 'HR Payroll Manager', 'HR Payroll User', 'Employee'],
     }
     filter_backends = [filters.OrderingFilter]
 
@@ -524,7 +524,7 @@ class PayslipViewSet(viewsets.ReadOnlyModelViewSet):
                     label = code
                 try:
                     amt_val = float(val)
-                    amt_str = f"₹{amt_val:,.2f}"
+                    amt_str = f"Rs. {amt_val:,.2f}"
                 except (ValueError, TypeError):
                     amt_str = str(val)
                 breakdown_data.append([
@@ -534,7 +534,7 @@ class PayslipViewSet(viewsets.ReadOnlyModelViewSet):
         else:
             breakdown_data.append([
                 Paragraph("No computed salary components.", cell_normal),
-                Paragraph("₹0.00", cell_right)
+                Paragraph("Rs. 0.00", cell_right)
             ])
 
         breakdown_table = Table(breakdown_data, colWidths=[370, 170])
@@ -557,7 +557,7 @@ class PayslipViewSet(viewsets.ReadOnlyModelViewSet):
             for adj in adjustments:
                 try:
                     amt_val = float(adj.amount)
-                    amt_str = f"₹{amt_val:,.2f}" if amt_val >= 0 else f"-₹{abs(amt_val):,.2f}"
+                    amt_str = f"Rs. {amt_val:,.2f}" if amt_val >= 0 else f"-Rs. {abs(amt_val):,.2f}"
                 except (ValueError, TypeError):
                     amt_str = str(adj.amount)
                 adj_data.append([
@@ -585,7 +585,7 @@ class PayslipViewSet(viewsets.ReadOnlyModelViewSet):
             textColor=colors.HexColor('#714B67'),
             alignment=2
         )
-        elements.append(Paragraph(f"<b>Net Pay: ₹{net_val:,.2f}</b>", net_pay_style))
+        elements.append(Paragraph(f"<b>Net Pay: Rs. {net_val:,.2f}</b>", net_pay_style))
 
         doc.build(elements)
         pdf_bytes = buffer.getvalue()
