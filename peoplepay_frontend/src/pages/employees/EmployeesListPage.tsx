@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, ExternalLink, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Plus, ExternalLink, CheckCircle2, AlertCircle, Loader2, LayoutList, Kanban, Building2 } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { DataTable, Column } from '../../components/shared/DataTable';
 import { SearchInput } from '../../components/shared/SearchInput';
@@ -11,7 +11,7 @@ import { IconButton } from '../../components/ui/IconButton';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
-import { useAuth } from '../../hooks/useAuth';
+import { usePermissions } from '../../hooks/usePermissions';
 import { employeesApi } from '../../services/api/employees';
 import { ApiError } from '../../services/api/client';
 import { Employee } from '../../types/employee';
@@ -31,13 +31,27 @@ const STATUS_OPTIONS = [
   { value: 'terminated', label: 'Terminated' },
 ];
 
+const KANBAN_DEPARTMENTS = ['Engineering', 'Product', 'HR', 'Finance', 'Sales', 'Operations'];
+
 export const EmployeesListPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const canManageEmployees = user?.role === 'Admin' || user?.role === 'HR Manager';
+  const { canPerformAction } = usePermissions();
+  const canManageEmployees = canPerformAction('manage_employees');
+
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+
+  // View Mode: 'list' vs 'kanban', persisted in localStorage
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>(() => {
+    const saved = localStorage.getItem('peoplepay_employees_view');
+    return saved === 'kanban' ? 'kanban' : 'list';
+  });
+
+  const handleViewModeChange = (mode: 'list' | 'kanban') => {
+    setViewMode(mode);
+    localStorage.setItem('peoplepay_employees_view', mode);
+  };
 
   // Modal & Form state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -139,7 +153,7 @@ export const EmployeesListPage: React.FC = () => {
         <div className="flex items-center gap-3">
           <Avatar src={item.avatarUrl} name={`${item.firstName} ${item.lastName}`} size="md" />
           <div>
-            <span className="font-semibold text-slate-900 block">{item.firstName} {item.lastName}</span>
+            <span className="font-semibold text-slate-900 dark:text-slate-100 block">{item.firstName} {item.lastName}</span>
             <span className="text-xs text-slate-400 font-mono">{item.code}</span>
           </div>
         </div>
@@ -151,8 +165,8 @@ export const EmployeesListPage: React.FC = () => {
       sortable: true,
       accessor: (item) => (
         <div>
-          <span className="font-medium text-slate-900 block">{item.jobTitle}</span>
-          <span className="text-xs text-slate-500">{item.department}</span>
+          <span className="font-medium text-slate-900 dark:text-slate-100 block">{item.jobTitle}</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400">{item.department}</span>
         </div>
       ),
     },
@@ -164,7 +178,7 @@ export const EmployeesListPage: React.FC = () => {
     {
       key: 'workingScheduleName',
       header: 'Working Schedule',
-      accessor: (item) => <span className="text-xs font-medium text-slate-600">{item.workingScheduleName}</span>,
+      accessor: (item) => <span className="text-xs font-medium text-slate-600 dark:text-slate-400">{item.workingScheduleName}</span>,
     },
     {
       key: 'status',
@@ -199,25 +213,121 @@ export const EmployeesListPage: React.FC = () => {
 
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
         <SearchInput value={search} onChange={setSearch} placeholder="Search by name, code, department..." />
+
+        {/* View Toggle: List / Kanban */}
+        <div className="flex items-center gap-1 bg-[var(--bg-surface-elevated)] p-1 rounded-xl border border-[var(--border-color)] shrink-0">
+          <button
+            type="button"
+            onClick={() => handleViewModeChange('list')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              viewMode === 'list'
+                ? 'bg-[var(--brand-primary)] text-white shadow-2xs'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            <LayoutList className="w-4 h-4" />
+            <span>List</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleViewModeChange('kanban')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              viewMode === 'kanban'
+                ? 'bg-[var(--brand-primary)] text-white shadow-2xs'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            <Kanban className="w-4 h-4" />
+            <span>Kanban</span>
+          </button>
+        </div>
       </div>
 
-      <DataTable
-        columns={columns}
-        data={filtered}
-        keyExtractor={(item) => item.id}
-        isLoading={isLoading}
-        emptyTitle="No employees found"
-        emptyDescription="No employee records match your search criteria."
-        onRowClick={(item) => navigate(`/employees/${item.id}`)}
-        rowClassName={(item) => (item.status === 'Terminated' ? 'bg-slate-100/70 opacity-60 hover:bg-slate-200/70' : '')}
-        actions={(item) => (
-          <IconButton
-            icon={<ExternalLink className="w-4 h-4" />}
-            label="View profile"
-            onClick={() => navigate(`/employees/${item.id}`)}
-          />
-        )}
-      />
+      {isLoading ? (
+        <div className="flex justify-center py-16">
+          <Loader2 className="w-8 h-8 text-[var(--brand-primary)] animate-spin" />
+        </div>
+      ) : viewMode === 'list' ? (
+        <DataTable
+          columns={columns}
+          data={filtered}
+          keyExtractor={(item) => item.id}
+          isLoading={isLoading}
+          emptyTitle="No employees found"
+          emptyDescription="No employee records match your search criteria."
+          onRowClick={(item) => navigate(`/employees/${item.id}`)}
+          rowClassName={(item) => (item.status === 'Terminated' ? 'bg-slate-100/70 dark:bg-slate-800/50 opacity-60 hover:bg-slate-200/70' : '')}
+          actions={(item) => (
+            <IconButton
+              icon={<ExternalLink className="w-4 h-4" />}
+              label="View profile"
+              onClick={() => navigate(`/employees/${item.id}`)}
+            />
+          )}
+        />
+      ) : (
+        /* Kanban Board View */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 pb-4">
+          {KANBAN_DEPARTMENTS.map((dept) => {
+            const deptEmployees = filtered.filter(
+              (e) => (e.department || '').toLowerCase() === dept.toLowerCase()
+            );
+            return (
+              <div key={dept} className="bg-[var(--bg-surface-elevated)] border border-[var(--border-color)] rounded-xl p-3 flex flex-col min-w-[200px]">
+                <div className="flex items-center justify-between mb-3 pb-2 border-b border-[var(--border-color)]">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-[var(--brand-primary)]" />
+                    <span className="font-semibold text-xs text-[var(--text-primary)] uppercase tracking-wider">{dept}</span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full bg-[var(--bg-surface)] text-[var(--text-secondary)] text-xs font-bold border border-[var(--border-color)]">
+                    {deptEmployees.length}
+                  </span>
+                </div>
+
+                <div className="space-y-3 flex-1 overflow-y-auto max-h-[calc(100vh-280px)] pr-1">
+                  {deptEmployees.length === 0 ? (
+                    <div className="text-center py-8 text-xs text-[var(--text-muted)] border border-dashed border-[var(--border-color)] rounded-lg">
+                      No employees
+                    </div>
+                  ) : (
+                    deptEmployees.map((emp) => {
+                      const isTerminated = emp.status?.toLowerCase() === 'terminated';
+                      return (
+                        <div
+                          key={emp.id}
+                          onClick={() => navigate(`/employees/${emp.id}`)}
+                          className={`p-3 rounded-lg border bg-[var(--bg-surface)] hover:border-[var(--brand-primary)] transition-all cursor-pointer shadow-2xs hover:shadow-xs group ${
+                            isTerminated
+                              ? 'opacity-60 bg-[var(--bg-surface-elevated)] border-slate-300 dark:border-slate-700'
+                              : 'border-[var(--border-color)]'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2.5 mb-2">
+                            <Avatar src={emp.avatarUrl} name={`${emp.firstName} ${emp.lastName}`} size="md" />
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-semibold text-xs text-[var(--text-primary)] group-hover:text-[var(--brand-primary)] transition-colors truncate">
+                                {emp.firstName} {emp.lastName}
+                              </h4>
+                              <p className="text-[11px] text-[var(--text-muted)] font-mono truncate">{emp.code}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between mt-2 pt-2 border-t border-[var(--border-color)]">
+                            <span className="text-[11px] font-medium text-[var(--text-secondary)] truncate max-w-[100px]">
+                              {emp.jobTitle || 'N/A'}
+                            </span>
+                            <StatusBadge status={emp.status} />
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* New Employee Modal */}
       <Modal

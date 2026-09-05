@@ -21,8 +21,8 @@ function mapContract(apiItem: any): Contract {
     wagePeriod: 'Monthly',
     salaryStructureId: '1',
     salaryStructureName: apiItem.salary_structure_placeholder || 'Standard Salary Structure',
-    workingScheduleId: '1',
-    workingScheduleName: 'Standard 40h Shift',
+    workingScheduleId: apiItem.working_schedule ? String(apiItem.working_schedule) : '',
+    workingScheduleName: apiItem.working_schedule_name || '',
     status: (statusStr === 'Running' || statusStr === 'Draft' || statusStr === 'Expired' || statusStr === 'Cancelled' ? statusStr : 'Running') as any,
     notes: '',
   };

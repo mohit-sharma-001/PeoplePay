@@ -8,7 +8,7 @@ import { IconButton } from '../../components/ui/IconButton';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
-import { useAuth } from '../../hooks/useAuth';
+import { usePermissions } from '../../hooks/usePermissions';
 import { payrollApi } from '../../services/api/payroll';
 import { ApiError } from '../../services/api/client';
 import { SalaryRule, SalaryStructure } from '../../types/payroll';
@@ -52,7 +52,6 @@ export const RulesListPage: React.FC = () => {
   // Conditional fields
   const [fixedAmount, setFixedAmount] = useState('');
   const [percentageValue, setPercentageValue] = useState('');
-  const [percentageBasisCode, setPercentageBasisCode] = useState('BASIC');
   const [formula, setFormula] = useState('');
 
   const loadData = async () => {
@@ -82,7 +81,6 @@ export const RulesListPage: React.FC = () => {
     setAmountType('fixed');
     setFixedAmount('');
     setPercentageValue('');
-    setPercentageBasisCode('BASIC');
     setFormula('');
     setGlobalError(null);
   };
@@ -105,10 +103,9 @@ export const RulesListPage: React.FC = () => {
       name: name.trim(),
       code: code.trim().toUpperCase(),
       category,
-      sequence: parseInt(sequence || '10', 10),
       amount_type: amountType,
       amount: amountType === 'fixed' ? parseFloat(fixedAmount || '0') : (amountType === 'percentage' ? parseFloat(percentageValue || '0') : 0),
-      percentage_basis_code: amountType === 'percentage' ? percentageBasisCode.trim().toUpperCase() : '',
+      percentage_basis_code: '',
       formula: amountType === 'formula' ? formula.trim() : '',
     };
 
@@ -199,8 +196,8 @@ export const RulesListPage: React.FC = () => {
     },
   ];
 
-  const { user } = useAuth();
-  const canManagePayroll = user?.role === 'Admin' || user?.role === 'HR Payroll Manager';
+  const { canPerformAction } = usePermissions();
+  const canManageRules = canPerformAction('manage_structures');
 
   return (
     <div className="space-y-6">
@@ -220,7 +217,7 @@ export const RulesListPage: React.FC = () => {
           { label: 'Salary Rules' },
         ]}
         actions={
-          canManagePayroll ? (
+          canManageRules ? (
             <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setIsModalOpen(true)}>
               New Rule
             </Button>
@@ -234,7 +231,7 @@ export const RulesListPage: React.FC = () => {
         keyExtractor={(item) => item.id}
         isLoading={isLoading}
         actions={
-          canManagePayroll ? (item) => (
+          canManageRules ? (item) => (
             <IconButton
               icon={<Trash2 className="w-4 h-4 text-rose-600" />}
               label="Delete rule"
@@ -348,19 +345,12 @@ export const RulesListPage: React.FC = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select
               label="Category *"
               options={CATEGORY_OPTIONS}
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-            />
-            <Input
-              label="Sequence *"
-              type="number"
-              value={sequence}
-              onChange={(e) => setSequence(e.target.value)}
-              required
             />
             <Select
               label="Computation Type *"
@@ -384,25 +374,15 @@ export const RulesListPage: React.FC = () => {
           )}
 
           {amountType === 'percentage' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input
-                label="Percentage Value (%) *"
-                type="number"
-                step="0.01"
-                placeholder="e.g. 40"
-                value={percentageValue}
-                onChange={(e) => setPercentageValue(e.target.value)}
-                required
-              />
-              <Input
-                label="Percentage Basis Rule Code *"
-                placeholder="e.g. BASIC"
-                value={percentageBasisCode}
-                onChange={(e) => setPercentageBasisCode(e.target.value)}
-                helperText="Code of the base rule to calculate % from"
-                required
-              />
-            </div>
+            <Input
+              label="Percentage Value (%) *"
+              type="number"
+              step="0.01"
+              placeholder="e.g. 40"
+              value={percentageValue}
+              onChange={(e) => setPercentageValue(e.target.value)}
+              required
+            />
           )}
 
           {amountType === 'formula' && (

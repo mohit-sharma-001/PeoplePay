@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 class ContractSerializer(serializers.ModelSerializer):
     employee_name = serializers.SerializerMethodField(read_only=True)
     employee_code = serializers.CharField(source='employee.employee_code', read_only=True)
-    effective_state = serializers.ReadOnlyField()
+    working_schedule_name = serializers.ReadOnlyField(source='working_schedule.name')
 
     class Meta:
         model = Contract
@@ -23,6 +23,8 @@ class ContractSerializer(serializers.ModelSerializer):
             'department',
             'job_position',
             'salary_structure_placeholder',
+            'working_schedule',
+            'working_schedule_name',
             'created_at',
             'updated_at',
         ]

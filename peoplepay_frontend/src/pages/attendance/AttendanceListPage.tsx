@@ -10,6 +10,7 @@ import { IconButton } from '../../components/ui/IconButton';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
+import { usePermissions } from '../../hooks/usePermissions';
 import { attendanceApi } from '../../services/api/attendance';
 import { employeesApi } from '../../services/api/employees';
 import { ApiError } from '../../services/api/client';
@@ -174,6 +175,9 @@ export const AttendanceListPage: React.FC = () => {
     },
   ];
 
+  const { canPerformAction } = usePermissions();
+  const canManageAttendance = canPerformAction('manage_attendance');
+
   return (
     <div className="space-y-6">
       {/* Toast Notification Banner */}
@@ -189,9 +193,11 @@ export const AttendanceListPage: React.FC = () => {
         subtitle="Track daily employee check-ins, check-outs, worked hours, and overtime."
         breadcrumbs={[{ label: 'Attendance' }]}
         actions={
-          <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setIsModalOpen(true)}>
-            Record Attendance
-          </Button>
+          canManageAttendance ? (
+            <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setIsModalOpen(true)}>
+              Record Attendance
+            </Button>
+          ) : undefined
         }
       />
 

@@ -56,13 +56,28 @@ class SalaryRule(TimeStampedModel):
     percentage_basis_code = models.CharField(max_length=50, blank=True, null=True)
     formula = models.TextField(blank=True, null=True)
 
+    sequence = models.IntegerField(default=10)
+
     class Meta:
-        ordering = ['category', 'name']
+        ordering = ['sequence', 'id']
         verbose_name = 'Salary Rule'
         verbose_name_plural = 'Salary Rules'
 
     def __str__(self):
         return f"{self.name} ({self.code}) - {self.category}"
+
+
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
+
+@receiver(post_delete, sender=SalaryRule)
+def renormalize_salary_rules_on_delete(sender, instance, **kwargs):
+    structure = instance.structure
+    remaining_rules = SalaryRule.objects.filter(structure=structure).order_by('sequence', 'id')
+    for idx, rule in enumerate(remaining_rules, start=1):
+        expected_seq = idx * 10
+        if rule.sequence != expected_seq:
+            SalaryRule.objects.filter(id=rule.id).update(sequence=expected_seq)
 
 
 class Payrun(TimeStampedModel):

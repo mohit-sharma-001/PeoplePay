@@ -23,14 +23,14 @@ class SalaryStructureViewSet(viewsets.ModelViewSet):
     """
     ModelViewSet for full CRUD management of Salary Structures.
     Full CRUD restricted to Admin and HR Payroll Manager.
-    Read-only (GET) additionally allowed for HR Payroll User.
+    Read-only (GET) additionally allowed for HR Manager and HR Payroll User.
     """
     queryset = SalaryStructure.objects.all().prefetch_related('rules').order_by('name')
     serializer_class = SalaryStructureSerializer
     permission_classes = [permissions.IsAuthenticated, HasRole]
     action_allowed_roles = {
-        'list': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
-        'retrieve': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
+        'list': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User'],
+        'retrieve': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User'],
         'create': ['Admin', 'HR Payroll Manager'],
         'update': ['Admin', 'HR Payroll Manager'],
         'partial_update': ['Admin', 'HR Payroll Manager'],
@@ -45,14 +45,14 @@ class SalaryRuleViewSet(viewsets.ModelViewSet):
     """
     ModelViewSet for full CRUD management of Salary Rules.
     Full CRUD restricted to Admin and HR Payroll Manager.
-    Read-only (GET) additionally allowed for HR Payroll User.
+    Read-only (GET) additionally allowed for HR Manager and HR Payroll User.
     """
-    queryset = SalaryRule.objects.all().select_related('structure').order_by('category', 'name')
+    queryset = SalaryRule.objects.all().select_related('structure').order_by('sequence', 'id')
     serializer_class = SalaryRuleSerializer
     permission_classes = [permissions.IsAuthenticated, HasRole]
     action_allowed_roles = {
-        'list': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
-        'retrieve': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
+        'list': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User'],
+        'retrieve': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User'],
         'create': ['Admin', 'HR Payroll Manager'],
         'update': ['Admin', 'HR Payroll Manager'],
         'partial_update': ['Admin', 'HR Payroll Manager'],
@@ -60,7 +60,19 @@ class SalaryRuleViewSet(viewsets.ModelViewSet):
     }
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['name', 'code', 'category']
-    ordering_fields = ['category', 'name', 'amount', 'created_at']
+    ordering_fields = ['sequence', 'category', 'name', 'amount', 'created_at']
+
+    def perform_create(self, serializer):
+        structure = serializer.validated_data.get('structure')
+        sequence = serializer.validated_data.get('sequence')
+        if sequence is None:
+            from django.db.models import Max
+            max_seq = SalaryRule.objects.filter(structure=structure).aggregate(Max('sequence'))['sequence__max']
+            sequence = (max_seq + 10) if max_seq is not None else 10
+        serializer.save(sequence=sequence)
+
+    def perform_destroy(self, instance):
+        super().perform_destroy(instance)
 
 
 class PayrunViewSet(viewsets.ModelViewSet):
@@ -71,13 +83,13 @@ class PayrunViewSet(viewsets.ModelViewSet):
     serializer_class = PayrunSerializer
     permission_classes = [permissions.IsAuthenticated, HasRole]
     action_allowed_roles = {
-        'list': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
-        'retrieve': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
-        'create': ['Admin', 'HR Payroll Manager'],
-        'update': ['Admin', 'HR Payroll Manager'],
-        'partial_update': ['Admin', 'HR Payroll Manager'],
+        'list': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User'],
+        'retrieve': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User'],
+        'create': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
+        'update': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
+        'partial_update': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
         'destroy': ['Admin', 'HR Payroll Manager'],
-        'compute': ['Admin', 'HR Payroll Manager'],
+        'compute': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
         'validate': ['Admin', 'HR Payroll Manager'],
         'mark_paid': ['Admin', 'HR Payroll Manager'],
     }
@@ -207,7 +219,7 @@ class PayrunViewSet(viewsets.ModelViewSet):
 
         for payslip in payrun.payslips.filter(is_excluded=False):
             raw_wage = float(payslip.contract.wage) if payslip.contract else 0.0
-            calc = calculate_worked_percentage(payslip.employee, payrun.date_from, payrun.date_to)
+            calc = calculate_worked_percentage(payslip.employee, payrun.date_from, payrun.date_to, contract=payslip.contract)
             worked_pct = calc["worked_percentage"]
             adjusted_wage = raw_wage * worked_pct
 
@@ -287,11 +299,11 @@ class PayslipViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = PayslipSerializer
     permission_classes = [permissions.IsAuthenticated, HasRole]
     action_allowed_roles = {
-        'list': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
-        'retrieve': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
-        'add_adjustment': ['Admin', 'HR Payroll Manager'],
-        'delete_adjustment': ['Admin', 'HR Payroll Manager'],
-        'pdf': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
+        'list': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User'],
+        'retrieve': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User'],
+        'add_adjustment': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
+        'delete_adjustment': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
+        'pdf': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User'],
     }
     filter_backends = [filters.OrderingFilter]
 

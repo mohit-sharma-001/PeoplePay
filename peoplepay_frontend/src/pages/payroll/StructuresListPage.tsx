@@ -7,7 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { IconButton } from '../../components/ui/IconButton';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
-import { useAuth } from '../../hooks/useAuth';
+import { usePermissions } from '../../hooks/usePermissions';
 import { payrollApi } from '../../services/api/payroll';
 import { ApiError } from '../../services/api/client';
 import { SalaryStructure } from '../../types/payroll';
@@ -96,8 +96,8 @@ export const StructuresListPage: React.FC = () => {
     }
   };
 
-  const { user } = useAuth();
-  const canManagePayroll = user?.role === 'Admin' || user?.role === 'HR Payroll Manager';
+  const { canPerformAction } = usePermissions();
+  const canManageStructures = canPerformAction('manage_structures');
 
   return (
     <div className="space-y-6">
@@ -117,7 +117,7 @@ export const StructuresListPage: React.FC = () => {
           { label: 'Salary Structures' },
         ]}
         actions={
-          canManagePayroll ? (
+          canManageStructures ? (
             <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setIsModalOpen(true)}>
               New Structure
             </Button>
@@ -135,7 +135,7 @@ export const StructuresListPage: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="purple">{struct.type}</Badge>
-                {canManagePayroll && (
+                {canManageStructures && (
                   <IconButton
                     icon={<Trash2 className="w-4 h-4 text-rose-600" />}
                     label="Delete structure"

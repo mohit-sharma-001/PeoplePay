@@ -124,10 +124,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
       : []),
   ];
 
-  const navItems = rawNavItems.filter((item) => {
-    if (item.path === '/admin/users') return userRole === 'Admin';
-    return canAccessModule(item.path);
-  });
+  const navItems = rawNavItems
+    .filter((item) => {
+      if (item.path === '/admin/users') return userRole === 'Admin';
+      return canAccessModule(item.path);
+    })
+    .map((item) => {
+      if (item.children) {
+        return {
+          ...item,
+          children: item.children.filter((child) => canAccessModule(child.path)),
+        };
+      }
+      return item;
+    });
 
   return (
     <>

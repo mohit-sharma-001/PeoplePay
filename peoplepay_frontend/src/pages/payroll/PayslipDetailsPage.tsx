@@ -28,8 +28,6 @@ export const PayslipDetailsPage: React.FC = () => {
   const [isSubmittingAdj, setIsSubmittingAdj] = useState(false);
   const [adjError, setAdjError] = useState('');
 
-  const isAuthority = role === 'Admin' || role === 'HR Payroll Manager';
-
   const loadData = async () => {
     setIsLoading(true);
     if (id) {
@@ -106,8 +104,10 @@ export const PayslipDetailsPage: React.FC = () => {
     );
   }
 
+  const { canPerformAction } = usePermissions();
+  const canManagePayroll = canPerformAction('manage_payroll');
   const canAdjust =
-    isAuthority &&
+    canManagePayroll &&
     !payslip.is_excluded &&
     (payslip.status === 'draft' || payslip.status === 'computed');
 

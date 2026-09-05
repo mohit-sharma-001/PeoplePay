@@ -16,7 +16,9 @@ import { usePermissions } from '../../hooks/usePermissions';
 export const PayrunDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { role } = usePermissions();
+  const { canPerformAction } = usePermissions();
+  const canManage = canPerformAction('manage_payroll');
+  const canApprove = canPerformAction('approve_payroll');
 
   const [payrun, setPayrun] = useState<Payrun | null>(null);
   const [payslips, setPayslips] = useState<Payslip[]>([]);
@@ -34,8 +36,6 @@ export const PayrunDetailsPage: React.FC = () => {
   const [editEmpIds, setEditEmpIds] = useState<number[]>([]);
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
   const [editErrorMsg, setEditErrorMsg] = useState('');
-
-  const isAuthority = role === 'Admin' || role === 'HR Payroll Manager';
 
   const loadData = async () => {
     setIsLoading(true);
@@ -262,7 +262,7 @@ export const PayrunDetailsPage: React.FC = () => {
         ]}
         actions={
           <div className="flex items-center gap-3">
-            {isAuthority && payrun.status === 'draft' && (
+            {canManage && payrun.status === 'draft' && (
               <>
                 <Button variant="outline" leftIcon={<Edit className="w-4 h-4" />} onClick={handleOpenEditModal} disabled={isProcessing}>
                   Edit
@@ -273,13 +273,13 @@ export const PayrunDetailsPage: React.FC = () => {
               </>
             )}
 
-            {isAuthority && payrun.status === 'computed' && (
+            {canApprove && payrun.status === 'computed' && (
               <Button leftIcon={<CheckCircle className="w-4 h-4" />} onClick={handleValidate} isLoading={isProcessing}>
                 Validate Payrun
               </Button>
             )}
 
-            {isAuthority && payrun.status === 'validated' && (
+            {canApprove && payrun.status === 'validated' && (
               <Button leftIcon={<DollarSign className="w-4 h-4" />} onClick={handleMarkPaid} isLoading={isProcessing}>
                 Mark Paid
               </Button>

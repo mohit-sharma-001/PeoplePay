@@ -53,6 +53,14 @@ class Contract(TimeStampedModel):
         blank=True,
         help_text="Temporary text note indicating intended salary structure name. Will be replaced by real ForeignKey when payroll app is created."
     )
+    working_schedule = models.ForeignKey(
+        'working_schedule.WorkingSchedule',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='contracts',
+        help_text="Optional shift schedule for expected working hours"
+    )
 
     class Meta:
         ordering = ['-date_start']

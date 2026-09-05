@@ -40,6 +40,7 @@ import { timeOffApi } from '../../services/api/timeoff';
 import { apiFetch, ApiError } from '../../services/api/client';
 import { authService } from '../../services/authService';
 import { useAuth } from '../../hooks/useAuth';
+import { usePermissions } from '../../hooks/usePermissions';
 import { Employee } from '../../types/employee';
 import { Contract } from '../../types/contract';
 import { Attendance } from '../../types/attendance';
@@ -242,10 +243,9 @@ export const EmployeeDetailsPage: React.FC = () => {
     loadEmployeeData();
   }, [id]);
 
-  const isHRorAdmin =
-    currentUser?.roles?.some((r) => r === 'Admin' || r === 'HR Manager') ||
-    currentUser?.role === 'Admin' ||
-    currentUser?.role === 'HR Manager';
+  const { canPerformAction } = usePermissions();
+  const canManageEmployees = canPerformAction('manage_employees');
+  const isHRorAdmin = canManageEmployees;
 
   const canCreateLogin = Boolean(isHRorAdmin && employee && (!employee.user || employee.user === null));
 

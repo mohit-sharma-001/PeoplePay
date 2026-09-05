@@ -190,5 +190,29 @@ class AuthEndpointsTestCase(TestCase):
         self.assertEqual(len(data), 1)
         self.assertEqual(data[0]['id'], self.employee_user.id)
 
+    def test_login_via_email(self):
+        """
+        Confirming login via email succeeds with the same response shape as username login.
+        """
+        # Login using username
+        res_username = self.client.post(
+            '/api/auth/login/',
+            data={"username": self.admin_user.username, "password": "Password123!"},
+            format='json'
+        )
+        self.assertEqual(res_username.status_code, status.HTTP_200_OK)
+
+        # Login using email in the username field
+        res_email = self.client.post(
+            '/api/auth/login/',
+            data={"username": self.admin_user.email, "password": "Password123!"},
+            format='json'
+        )
+        self.assertEqual(res_email.status_code, status.HTTP_200_OK)
+
+        # Check response structures are identical
+        self.assertEqual(res_username.data['data']['user']['id'], res_email.data['data']['user']['id'])
+        self.assertIn('token', res_email.data['data'])
+
 
 

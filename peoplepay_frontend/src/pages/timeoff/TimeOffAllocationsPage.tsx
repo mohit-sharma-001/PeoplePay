@@ -3,10 +3,14 @@ import { Plus } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { DataTable, Column } from '../../components/shared/DataTable';
 import { Button } from '../../components/ui/Button';
+import { usePermissions } from '../../hooks/usePermissions';
 import { timeOffApi } from '../../services/api/timeoff';
 import { TimeOffAllocation } from '../../types/timeoff';
 
 export const TimeOffAllocationsPage: React.FC = () => {
+  const { canPerformAction } = usePermissions();
+  const canManageTimeOff = canPerformAction('manage_timeoff');
+
   const [allocations, setAllocations] = useState<TimeOffAllocation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -27,8 +31,8 @@ export const TimeOffAllocationsPage: React.FC = () => {
       sortable: true,
       accessor: (item) => (
         <div>
-          <span className="font-semibold text-slate-900 block">{item.employeeName}</span>
-          <span className="text-xs text-slate-500">{item.department}</span>
+          <span className="font-semibold text-slate-900 dark:text-slate-100 block">{item.employeeName}</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400">{item.department}</span>
         </div>
       ),
     },
@@ -36,28 +40,28 @@ export const TimeOffAllocationsPage: React.FC = () => {
       key: 'timeOffTypeName',
       header: 'Leave Type',
       sortable: true,
-      accessor: (item) => <span className="font-medium text-blue-600">{item.timeOffTypeName}</span>,
+      accessor: (item) => <span className="font-medium text-blue-600 dark:text-blue-400">{item.timeOffTypeName}</span>,
     },
     {
       key: 'allocatedDays',
       header: 'Allocated Days',
       sortable: true,
       align: 'right',
-      accessor: (item) => <span className="font-bold text-slate-900">{item.allocatedDays} days</span>,
+      accessor: (item) => <span className="font-bold text-slate-900 dark:text-slate-100">{item.allocatedDays} days</span>,
     },
     {
       key: 'usedDays',
       header: 'Used Days',
       sortable: true,
       align: 'right',
-      accessor: (item) => <span className="font-semibold text-rose-600">{item.usedDays} days</span>,
+      accessor: (item) => <span className="font-semibold text-rose-600 dark:text-rose-400">{item.usedDays} days</span>,
     },
     {
       key: 'remainingDays',
       header: 'Remaining Days',
       sortable: true,
       align: 'right',
-      accessor: (item) => <span className="font-bold text-emerald-600">{item.remainingDays} days</span>,
+      accessor: (item) => <span className="font-bold text-emerald-600 dark:text-emerald-400">{item.remainingDays} days</span>,
     },
   ];
 
@@ -71,9 +75,11 @@ export const TimeOffAllocationsPage: React.FC = () => {
           { label: 'Allocations' },
         ]}
         actions={
-          <Button leftIcon={<Plus className="w-4 h-4" />}>
-            New Allocation
-          </Button>
+          canManageTimeOff ? (
+            <Button leftIcon={<Plus className="w-4 h-4" />}>
+              New Allocation
+            </Button>
+          ) : undefined
         }
       />
 

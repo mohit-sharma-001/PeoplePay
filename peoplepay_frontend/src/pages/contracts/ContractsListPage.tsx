@@ -11,6 +11,7 @@ import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { useAuth } from '../../hooks/useAuth';
+import { usePermissions } from '../../hooks/usePermissions';
 import { contractsApi } from '../../services/api/contracts';
 import { employeesApi } from '../../services/api/employees';
 import { ApiError } from '../../services/api/client';
@@ -46,17 +47,21 @@ export const ContractsListPage: React.FC = () => {
   const [dateStart, setDateStart] = useState(() => new Date().toISOString().split('T')[0]);
   const [dateEnd, setDateEnd] = useState('');
   const [stateVal, setStateVal] = useState('running');
+  const [workingSchedules, setWorkingSchedules] = useState<{ id: string; name: string }[]>([]);
+  const [workingScheduleId, setWorkingScheduleId] = useState('');
   const [department, setDepartment] = useState('Engineering');
   const [jobPosition, setJobPosition] = useState('Software Engineer');
 
   const loadData = async () => {
     setIsLoading(true);
-    const [cRes, eRes] = await Promise.all([
+    const [cRes, eRes, wsRes] = await Promise.all([
       contractsApi.getAll(),
       employeesApi.getAll(),
+      employeesApi.getSchedules(),
     ]);
     setContracts(cRes.data || []);
     setEmployees(eRes.data || []);
+    setWorkingSchedules((wsRes.data || []).map((ws: any) => ({ id: String(ws.id), name: ws.name })));
     if (eRes.data && eRes.data.length > 0 && !employeeId) {
       setEmployeeId(eRes.data[0].id);
       setDepartment(eRes.data[0].department || 'Engineering');
@@ -89,6 +94,7 @@ export const ContractsListPage: React.FC = () => {
     setDateStart(new Date().toISOString().split('T')[0]);
     setDateEnd('');
     setStateVal('running');
+    setWorkingScheduleId('');
     setFieldErrors({});
     setGlobalError(null);
   };
@@ -101,6 +107,7 @@ export const ContractsListPage: React.FC = () => {
     setDateEnd(c.endDate ? c.endDate.split('T')[0] : '');
     const statusLower = (c.status || 'Running').toLowerCase();
     setStateVal(statusLower === 'expired' ? 'running' : statusLower);
+    setWorkingScheduleId(c.workingScheduleId || '');
 
     setDepartment(c.department || 'Engineering');
     setJobPosition(c.jobTitle || 'Software Engineer');
@@ -127,6 +134,7 @@ export const ContractsListPage: React.FC = () => {
       state: stateVal,
       department,
       job_position: jobPosition,
+      working_schedule: workingScheduleId ? parseInt(workingScheduleId, 10) : null,
     };
 
     try {
@@ -229,7 +237,8 @@ export const ContractsListPage: React.FC = () => {
     },
   ];
 
-  const canManageContracts = user?.role === 'Admin' || user?.role === 'HR Manager';
+  const { canPerformAction } = usePermissions();
+  const canManageContracts = canPerformAction('manage_contracts');
 
   return (
     <div className="space-y-6">
@@ -360,6 +369,16 @@ export const ContractsListPage: React.FC = () => {
               helperText="Leave blank for permanent / indefinite contracts"
             />
           </div>
+
+          <Select
+            label="Working Schedule (Optional)"
+            options={[
+              { value: '', label: 'Default / None (Fallback to Employee Schedule)' },
+              ...workingSchedules.map((ws) => ({ value: ws.id, label: ws.name })),
+            ]}
+            value={workingScheduleId}
+            onChange={(e) => setWorkingScheduleId(e.target.value)}
+          />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input

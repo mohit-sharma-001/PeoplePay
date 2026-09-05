@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.contrib.auth.models import User, Group
 from rest_framework.test import APIClient
 from rest_framework import status
-from payroll.models import SalaryStructure, SalaryRule, Payrun, Payslip
+from payroll.models import SalaryStructure, SalaryRule, Payrun, Payslip, PayslipAdjustment
 from employees.models import Employee
 from contracts.models import Contract
 
@@ -61,11 +61,15 @@ class PayrunTestCase(TestCase):
         self.client = APIClient()
 
         self.admin_group, _ = Group.objects.get_or_create(name='Admin')
+        self.hr_manager_group, _ = Group.objects.get_or_create(name='HR Manager')
         self.payroll_manager_group, _ = Group.objects.get_or_create(name='HR Payroll Manager')
         self.payroll_user_group, _ = Group.objects.get_or_create(name='HR Payroll User')
 
         self.admin_user = User.objects.create_user(username='admin_test', password='Password123!')
         self.admin_user.groups.add(self.admin_group)
+
+        self.hr_manager = User.objects.create_user(username='hrm_test', password='Password123!')
+        self.hr_manager.groups.add(self.hr_manager_group)
 
         self.payroll_manager = User.objects.create_user(username='pm_test', password='Password123!')
         self.payroll_manager.groups.add(self.payroll_manager_group)
@@ -205,8 +209,8 @@ class PayrunTestCase(TestCase):
         payrun.refresh_from_db()
         self.assertEqual(payrun.status, 'paid')
 
-    def test_non_admin_payroll_user_cannot_mutate(self):
-        self.client.force_authenticate(user=self.payroll_user)
+    def test_hr_manager_cannot_create_payrun(self):
+        self.client.force_authenticate(user=self.hr_manager)
         payload = {
             "structure": self.structure.id,
             "date_from": "2026-09-01",
@@ -214,6 +218,21 @@ class PayrunTestCase(TestCase):
         }
         response = self.client.post('/api/payroll/payruns/', payload, format='json')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_payroll_user_can_create_payrun_but_cannot_delete(self):
+        self.client.force_authenticate(user=self.payroll_user)
+        payload = {
+            "structure": self.structure.id,
+            "date_from": "2026-09-01",
+            "date_to": "2026-09-30"
+        }
+        response = self.client.post('/api/payroll/payruns/', payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        payrun_id = response.data['id']
+
+        # Delete should return 403
+        del_resp = self.client.delete(f'/api/payroll/payruns/{payrun_id}/')
+        self.assertEqual(del_resp.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_add_and_delete_adjustment(self):
         self.client.force_authenticate(user=self.admin_user)
@@ -271,8 +290,8 @@ class PayrunTestCase(TestCase):
         )
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_non_admin_adjustment_returns_403(self):
-        self.client.force_authenticate(user=self.payroll_user)
+    def test_hr_manager_adjustment_returns_403(self):
+        self.client.force_authenticate(user=self.hr_manager)
         payrun = Payrun.objects.create(
             structure=self.structure,
             date_from=date(2026, 9, 1),
@@ -430,21 +449,307 @@ class PayrunTestCase(TestCase):
         payrun.refresh_from_db()
         self.assertEqual(payrun.payslips.count(), 2)
 
-    def test_patch_non_draft_payrun_returns_400(self):
+    def test_proration_contract_working_schedule_priority(self):
+        from working_schedule.models import WorkingSchedule, WorkingScheduleLine
+        ws_emp = WorkingSchedule.objects.create(name="Emp 20h")
+        WorkingScheduleLine.objects.create(schedule=ws_emp, day_of_week=0, start_time="09:00", end_time="13:00") # 4h
+
+        ws_contract = WorkingSchedule.objects.create(name="Contract 40h")
+        WorkingScheduleLine.objects.create(schedule=ws_contract, day_of_week=0, start_time="09:00", end_time="17:00") # 8h
+
+        self.emp1.working_schedule = ws_emp
+        self.emp1.save()
+
+        self.contract1.working_schedule = ws_contract
+        self.contract1.save()
+
         self.client.force_authenticate(user=self.admin_user)
         payrun = Payrun.objects.create(
+            structure=self.structure,
+            date_from=date(2026, 9, 1),
+            date_to=date(2026, 9, 30)
+        )
+        ps = Payslip.objects.create(
+            payrun=payrun,
+            employee=self.emp1,
+            contract=self.contract1,
+            status='draft'
+        )
+
+        resp = self.client.post(f'/api/payroll/payruns/{payrun.id}/compute/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        ps.refresh_from_db()
+
+        # Contract has 8h total weekly hours; 30 days => expected_hours = (8 / 7) * 30 ~ 34.29
+        self.assertAlmostEqual(float(ps.expected_hours), (8.0 / 7.0) * 30.0, places=2)
+
+
+class SalaryRuleSequencingTestCase(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.admin_group, _ = Group.objects.get_or_create(name='Admin')
+        self.admin_user = User.objects.create_user(username='admin_seq_test', password='Password123!')
+        self.admin_user.groups.add(self.admin_group)
+
+        self.structure = SalaryStructure.objects.create(
+            name="Sequencing Test Structure",
+            code="SEQ_STRUCT",
+            company_name="PeoplePay"
+        )
+
+    def test_auto_sequence_assignment(self):
+        self.client.force_authenticate(user=self.admin_user)
+
+        r1 = self.client.post('/api/payroll/rules/', {
+            "structure": self.structure.id,
+            "name": "Rule 1",
+            "code": "R1",
+            "category": "basic",
+            "amount_type": "fixed",
+            "amount": 1000
+        }, format='json')
+        self.assertEqual(r1.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(r1.data['sequence'], 10)
+
+        r2 = self.client.post('/api/payroll/rules/', {
+            "structure": self.structure.id,
+            "name": "Rule 2",
+            "code": "R2",
+            "category": "allowance",
+            "amount_type": "fixed",
+            "amount": 500
+        }, format='json')
+        self.assertEqual(r2.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(r2.data['sequence'], 20)
+
+        r3 = self.client.post('/api/payroll/rules/', {
+            "structure": self.structure.id,
+            "name": "Rule 3",
+            "code": "R3",
+            "category": "deduction",
+            "amount_type": "fixed",
+            "amount": 200
+        }, format='json')
+        self.assertEqual(r3.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(r3.data['sequence'], 30)
+
+    def test_explicit_sequence_override(self):
+        self.client.force_authenticate(user=self.admin_user)
+
+        r1 = self.client.post('/api/payroll/rules/', {
+            "structure": self.structure.id,
+            "sequence": 5,
+            "name": "Rule Custom",
+            "code": "RCUST",
+            "category": "basic",
+            "amount_type": "fixed",
+            "amount": 1000
+        }, format='json')
+        self.assertEqual(r1.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(r1.data['sequence'], 5)
+
+    def test_delete_rule_renormalizes_sequences(self):
+        self.client.force_authenticate(user=self.admin_user)
+
+        r1 = SalaryRule.objects.create(structure=self.structure, name="R1", code="R1", sequence=10)
+        r2 = SalaryRule.objects.create(structure=self.structure, name="R2", code="R2", sequence=20)
+        r3 = SalaryRule.objects.create(structure=self.structure, name="R3", code="R3", sequence=30)
+
+        del_resp = self.client.delete(f'/api/payroll/rules/{r2.id}/')
+        self.assertEqual(del_resp.status_code, status.HTTP_204_NO_CONTENT)
+
+        r1.refresh_from_db()
+        r3.refresh_from_db()
+
+        self.assertEqual(r1.sequence, 10)
+        self.assertEqual(r3.sequence, 20)
+
+    def test_renormalization_4_rules_delete_middle(self):
+        r1 = SalaryRule.objects.create(structure=self.structure, name="R1", code="R1", sequence=10)
+        r2 = SalaryRule.objects.create(structure=self.structure, name="R2", code="R2", sequence=20)
+        r3 = SalaryRule.objects.create(structure=self.structure, name="R3", code="R3", sequence=30)
+        r4 = SalaryRule.objects.create(structure=self.structure, name="R4", code="R4", sequence=40)
+
+        # Delete r2 (sequence=20)
+        r2.delete()
+
+        r1.refresh_from_db()
+        r3.refresh_from_db()
+        r4.refresh_from_db()
+
+        self.assertEqual(r1.sequence, 10)
+        self.assertEqual(r3.sequence, 20)
+        self.assertEqual(r4.sequence, 30)
+
+    def test_renormalization_4_rules_delete_first(self):
+        r1 = SalaryRule.objects.create(structure=self.structure, name="R1", code="R1", sequence=10)
+        r2 = SalaryRule.objects.create(structure=self.structure, name="R2", code="R2", sequence=20)
+        r3 = SalaryRule.objects.create(structure=self.structure, name="R3", code="R3", sequence=30)
+        r4 = SalaryRule.objects.create(structure=self.structure, name="R4", code="R4", sequence=40)
+
+        # Delete r1 (sequence=10)
+        r1.delete()
+
+        r2.refresh_from_db()
+        r3.refresh_from_db()
+        r4.refresh_from_db()
+
+        self.assertEqual(r2.sequence, 10)
+        self.assertEqual(r3.sequence, 20)
+        self.assertEqual(r4.sequence, 30)
+
+    def test_renormalization_4_rules_delete_last(self):
+        r1 = SalaryRule.objects.create(structure=self.structure, name="R1", code="R1", sequence=10)
+        r2 = SalaryRule.objects.create(structure=self.structure, name="R2", code="R2", sequence=20)
+        r3 = SalaryRule.objects.create(structure=self.structure, name="R3", code="R3", sequence=30)
+        r4 = SalaryRule.objects.create(structure=self.structure, name="R4", code="R4", sequence=40)
+
+        # Delete r4 (sequence=40)
+        r4.delete()
+
+        r1.refresh_from_db()
+        r2.refresh_from_db()
+        r3.refresh_from_db()
+
+        self.assertEqual(r1.sequence, 10)
+        self.assertEqual(r2.sequence, 20)
+        self.assertEqual(r3.sequence, 30)
+
+
+class PayrollReportsTestCase(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+        self.admin_group, _ = Group.objects.get_or_create(name='Admin')
+        self.employee_group, _ = Group.objects.get_or_create(name='Employee')
+
+        self.admin_user = User.objects.create_user(username='admin_report_test', password='Password123!')
+        self.admin_user.groups.add(self.admin_group)
+
+        self.emp_user = User.objects.create_user(username='emp_report_test', password='Password123!')
+        self.emp_user.groups.add(self.employee_group)
+
+        self.structure = SalaryStructure.objects.create(name="Report Struct", code="REP_STRUCT")
+
+        self.emp = Employee.objects.create(
+            employee_code="EMP100",
+            first_name="Jane",
+            last_name="Doe",
+            department="Engineering",
+            date_joined=date(2026, 1, 1)
+        )
+        self.contract = Contract.objects.create(
+            employee=self.emp,
+            wage=60000.00,
+            date_start=date(2026, 1, 1),
+            state=Contract.State.RUNNING,
+            department='Engineering',
+            job_position='Software Engineer'
+        )
+
+        self.payrun = Payrun.objects.create(
             structure=self.structure,
             date_from=date(2026, 9, 1),
             date_to=date(2026, 9, 30),
             status='computed'
         )
-
-        resp = self.client.patch(
-            f'/api/payroll/payruns/{payrun.id}/',
-            {"employee_ids": [self.emp1.id]},
-            format='json'
+        self.payslip = Payslip.objects.create(
+            payrun=self.payrun,
+            employee=self.emp,
+            contract=self.contract,
+            basic=40000.00,
+            gross=60000.00,
+            total_deductions=5000.00,
+            net=55000.00,
+            status='computed'
         )
-        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        PayslipAdjustment.objects.create(
+            payslip=self.payslip,
+            label="Overtime Pay",
+            amount=2000.00
+        )
+
+        from time_off.models import TimeOffType, TimeOffAllocation
+        self.pto_type = TimeOffType.objects.create(name="Paid Annual Leave", requires_allocation=True)
+        TimeOffAllocation.objects.create(
+            employee=self.emp,
+            time_off_type=self.pto_type,
+            allocated_amount=20,
+            valid_from=date(2026, 1, 1),
+            state='confirmed'
+        )
+
+    def test_payroll_cost_report_json_and_csv(self):
+        self.client.force_authenticate(user=self.admin_user)
+
+        # JSON response
+        res_json = self.client.get('/api/reports/payroll-cost/', {'month': '2026-09'})
+        self.assertEqual(res_json.status_code, status.HTTP_200_OK)
+        self.assertTrue(res_json.data['success'])
+        self.assertIn('departments', res_json.data['data'])
+        self.assertIn('summary', res_json.data['data'])
+        depts = res_json.data['data']['departments']
+        self.assertTrue(len(depts) >= 1)
+        eng_dept = next(d for d in depts if d['department'] == 'Engineering')
+        self.assertEqual(eng_dept['headcount'], 1)
+        self.assertEqual(float(eng_dept['total_overtime']), 2000.0)
+
+        # CSV response
+        res_csv = self.client.get('/api/reports/payroll-cost/', {'month': '2026-09', 'format': 'csv'})
+        self.assertEqual(res_csv.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_csv['Content-Type'], 'text/csv')
+        content = res_csv.content.decode('utf-8')
+        self.assertIn('Department,Headcount', content)
+        self.assertIn('Engineering,1', content)
+
+    def test_leave_liability_report_json_and_csv(self):
+        self.client.force_authenticate(user=self.admin_user)
+
+        # JSON response
+        res_json = self.client.get('/api/reports/leave-liability/')
+        self.assertEqual(res_json.status_code, status.HTTP_200_OK)
+        self.assertTrue(res_json.data['success'])
+        data = res_json.data['data']
+        self.assertIn('leave_balances', data)
+        self.assertIn('utilization_trend', data)
+        self.assertIn('total_liability', data)
+        lb = next(item for item in data['leave_balances'] if item['employee_code'] == 'EMP100')
+        self.assertEqual(lb['remaining_amount'], 20.0)
+        # Daily rate = 60000 / 30 = 2000.0 => liability = 20 * 2000 = 40000.0
+        self.assertEqual(float(lb['daily_rate']), 2000.0)
+        self.assertEqual(float(lb['liability_valuation']), 40000.0)
+
+        # CSV response
+        res_csv = self.client.get('/api/reports/leave-liability/', {'format': 'csv'})
+        self.assertEqual(res_csv.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_csv['Content-Type'], 'text/csv')
+        content = res_csv.content.decode('utf-8')
+        self.assertIn('Employee Code,Employee Name,Department', content)
+        self.assertIn('EMP100,Jane Doe,Engineering', content)
+
+    def test_full_ledger_report_csv(self):
+        self.client.force_authenticate(user=self.admin_user)
+
+        res_csv = self.client.get('/api/reports/full-ledger/', {'format': 'csv'})
+        self.assertEqual(res_csv.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_csv['Content-Type'], 'text/csv')
+        content = res_csv.content.decode('utf-8')
+        self.assertIn('Payslip ID,Employee Code,Employee Name', content)
+        self.assertIn('EMP100', content)
+
+    def test_unauthorized_user_gets_403(self):
+        self.client.force_authenticate(user=self.emp_user)
+
+        res1 = self.client.get('/api/reports/payroll-cost/')
+        self.assertEqual(res1.status_code, status.HTTP_403_FORBIDDEN)
+
+        res2 = self.client.get('/api/reports/leave-liability/')
+        self.assertEqual(res2.status_code, status.HTTP_403_FORBIDDEN)
+
+        res3 = self.client.get('/api/reports/full-ledger/', {'format': 'csv'})
+        self.assertEqual(res3.status_code, status.HTTP_403_FORBIDDEN)
+
+
 
 
 

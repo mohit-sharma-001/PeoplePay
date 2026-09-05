@@ -11,6 +11,7 @@ import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { useAuth } from '../../hooks/useAuth';
+import { usePermissions } from '../../hooks/usePermissions';
 import { timeOffApi } from '../../services/api/timeoff';
 import { ApiError } from '../../services/api/client';
 import { TimeOffRequest, TimeOffAllocation, TimeOffType } from '../../types/timeoff';
@@ -42,7 +43,8 @@ export const TimeOffRequestsPage: React.FC = () => {
   const [dateTo, setDateTo] = useState(() => new Date().toISOString().split('T')[0]);
   const [reason, setReason] = useState('');
 
-  const canApproveTimeOff = user?.role === 'Admin' || user?.role === 'HR Manager';
+  const { canPerformAction } = usePermissions();
+  const canApproveTimeOff = canPerformAction('approve_timeoff');
 
   const loadData = async () => {
     setIsLoading(true);

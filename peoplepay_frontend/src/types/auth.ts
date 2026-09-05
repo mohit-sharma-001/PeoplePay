@@ -9,6 +9,8 @@ export type Permission =
   | 'view_dashboard'
   | 'view_employees'
   | 'manage_employees'
+  | 'view_schedules'
+  | 'manage_schedules'
   | 'view_contracts'
   | 'manage_contracts'
   | 'view_attendance'
@@ -19,6 +21,8 @@ export type Permission =
   | 'view_payroll'
   | 'manage_payroll'
   | 'approve_payroll'
+  | 'delete_payroll'
+  | 'manage_structures'
   | 'view_reports'
   | 'manage_users';
 

@@ -18,7 +18,6 @@ from core.auth_views import (
 urlpatterns = [
     path('', RedirectView.as_view(url='/api/', permanent=False), name='root-redirect'),
     path('admin/', admin.site.urls),
-    path('api/', include('core.urls')),
     path('api/auth/login/', login_view, name='api-auth-login'),
     path('api/auth/logout/', logout_view, name='api-auth-logout'),
     path('api/auth/register/', register_view, name='api-auth-register'),
@@ -30,5 +29,7 @@ urlpatterns = [
     path('api/attendance/', include('attendance.urls')),
     path('api/time-off/', include('time_off.urls')),
     path('api/payroll/', include('payroll.urls')),
+    path('api/reports/', include('payroll.report_urls')),
     path('api/dashboard/', include('dashboard.urls')),
+    path('api/', include('core.urls')),
 ]

@@ -75,13 +75,20 @@ def compute_salary_for_structure(structure, initial_context=None):
     return context, round(basic_val, 2), round(gross_val, 2), round(deductions_val, 2), round(net_val, 2)
 
 
-def calculate_worked_percentage(employee, date_from, date_to):
+def calculate_worked_percentage(employee, date_from, date_to, contract=None):
     """
     Calculates expected working hours and actual worked hours for an employee
     during a date range [date_from, date_to], returning expected_hours, actual_hours,
     and worked_percentage.
+
+    Prioritizes contract.working_schedule if set, falling back to employee.working_schedule.
     """
-    working_schedule = getattr(employee, 'working_schedule', None)
+    working_schedule = None
+    if contract and getattr(contract, 'working_schedule', None):
+        working_schedule = contract.working_schedule
+    elif employee and getattr(employee, 'working_schedule', None):
+        working_schedule = employee.working_schedule
+
     if working_schedule:
         weekly_hours = float(working_schedule.total_weekly_hours or 40.0)
         num_days = (date_to - date_from).days + 1

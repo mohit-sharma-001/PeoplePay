@@ -3,10 +3,12 @@ from payroll.models import SalaryStructure, SalaryRule, Payrun, Payslip, Payslip
 
 
 class SalaryRuleSerializer(serializers.ModelSerializer):
+    sequence = serializers.IntegerField(required=False, allow_null=True)
+
     class Meta:
         model = SalaryRule
         fields = [
-            'id', 'structure', 'name', 'code', 'category', 'amount_type',
+            'id', 'structure', 'sequence', 'name', 'code', 'category', 'amount_type',
             'amount', 'percentage_basis_code', 'formula', 'created_at', 'updated_at'
         ]
 

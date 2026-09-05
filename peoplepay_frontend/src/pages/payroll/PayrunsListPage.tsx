@@ -8,6 +8,7 @@ import { StatusBadge } from '../../components/shared/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { IconButton } from '../../components/ui/IconButton';
 import { Card } from '../../components/ui/Card';
+import { usePermissions } from '../../hooks/usePermissions';
 import { payrollApi } from '../../services/api/payroll';
 import { employeesApi } from '../../services/api/employees';
 import { Payrun, SalaryStructure } from '../../types/payroll';
@@ -175,6 +176,9 @@ export const PayrunsListPage: React.FC = () => {
     },
   ];
 
+  const { canPerformAction } = usePermissions();
+  const canManagePayroll = canPerformAction('manage_payroll');
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -185,9 +189,11 @@ export const PayrunsListPage: React.FC = () => {
           { label: 'Payruns' },
         ]}
         actions={
-          <Button leftIcon={<Plus className="w-4 h-4" />} onClick={handleOpenWizard}>
-            New Payrun
-          </Button>
+          canManagePayroll ? (
+            <Button leftIcon={<Plus className="w-4 h-4" />} onClick={handleOpenWizard}>
+              New Payrun
+            </Button>
+          ) : undefined
         }
       />
 

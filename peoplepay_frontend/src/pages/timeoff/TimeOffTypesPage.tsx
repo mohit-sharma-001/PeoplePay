@@ -7,14 +7,14 @@ import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
-import { useAuth } from '../../hooks/useAuth';
+import { usePermissions } from '../../hooks/usePermissions';
 import { timeOffApi } from '../../services/api/timeoff';
 import { TimeOffType } from '../../types/timeoff';
 import { ApiError } from '../../services/api/client';
 
 export const TimeOffTypesPage: React.FC = () => {
-  const { user } = useAuth();
-  const isAdminOrHR = user?.role === 'Admin' || user?.role === 'HR Manager';
+  const { canPerformAction } = usePermissions();
+  const canManageTimeOff = canPerformAction('manage_timeoff');
 
   const [types, setTypes] = useState<TimeOffType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -162,7 +162,7 @@ export const TimeOffTypesPage: React.FC = () => {
           { label: 'Leave Types' },
         ]}
         actions={
-          isAdminOrHR ? (
+          canManageTimeOff ? (
             <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setIsCreateModalOpen(true)}>
               New Leave Type
             </Button>
@@ -203,7 +203,7 @@ export const TimeOffTypesPage: React.FC = () => {
                 </div>
               </div>
 
-              {isAdminOrHR && (
+              {canManageTimeOff && (
                 <div className="pt-4">
                   <Button
                     variant="outline"

@@ -21,12 +21,12 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     action_allowed_roles = {
         'list': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User', 'Employee'],
         'retrieve': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User', 'Employee'],
-        'create': ['Admin', 'HR Manager'],
-        'update': ['Admin', 'HR Manager'],
-        'partial_update': ['Admin', 'HR Manager'],
-        'destroy': ['Admin', 'HR Manager'],
-        'create_login': ['Admin', 'HR Manager'],
-        'terminate': ['Admin', 'HR Manager'],
+        'create': ['Admin', 'HR Manager', 'HR Payroll User'],
+        'update': ['Admin', 'HR Manager', 'HR Payroll User'],
+        'partial_update': ['Admin', 'HR Manager', 'HR Payroll User'],
+        'destroy': ['Admin', 'HR Manager', 'HR Payroll User'],
+        'create_login': ['Admin', 'HR Manager', 'HR Payroll User'],
+        'terminate': ['Admin', 'HR Manager', 'HR Payroll User'],
         'reactivate': ['Admin'],
     }
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
