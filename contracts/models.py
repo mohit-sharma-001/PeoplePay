@@ -39,9 +39,10 @@ class Contract(TimeStampedModel):
     )
     state = models.CharField(
         max_length=20,
-        choices=MANUAL_STATE_CHOICES,
+        choices=State.choices,
         default=State.DRAFT
     )
+
     department = models.CharField(
         max_length=50,
         choices=Employee.Department.choices
