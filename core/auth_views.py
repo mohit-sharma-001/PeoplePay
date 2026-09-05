@@ -59,7 +59,17 @@ def login_view(request):
         )
 
     token, _ = Token.objects.get_or_create(user=user)
+
+    # Ensure superuser / staff accounts are automatically assigned the Admin group role
+    if user.is_superuser or user.is_staff:
+        from django.contrib.auth.models import Group
+        admin_group, _ = Group.objects.get_or_create(name='Admin')
+        if not user.groups.filter(name='Admin').exists():
+            user.groups.add(admin_group)
+
     roles = list(user.groups.values_list('name', flat=True))
+    if not roles and user.is_superuser:
+        roles = ['Admin']
 
     employee_id = None
     if hasattr(user, 'employee_profile') and user.employee_profile:
@@ -78,6 +88,7 @@ def login_view(request):
             "employee_id": employee_id,
         }
     }
+
 
     return api_response(
         data=data,
