@@ -66,4 +66,12 @@ export const attendanceApi = {
     });
     return { ...res, data: mapAttendance(res.data) };
   },
+
+  async create(payload: any): Promise<ApiResponse<Attendance>> {
+    const res = await apiFetch<any>('/api/attendance/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return { ...res, data: mapAttendance(res.data) };
+  },
 };

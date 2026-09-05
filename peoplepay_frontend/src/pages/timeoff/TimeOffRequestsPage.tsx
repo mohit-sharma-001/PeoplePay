@@ -1,28 +1,153 @@
 import React, { useEffect, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Check, X, CheckCircle2, AlertCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { DataTable, Column } from '../../components/shared/DataTable';
 import { SearchInput } from '../../components/shared/SearchInput';
 import { StatusBadge } from '../../components/shared/StatusBadge';
 import { Button } from '../../components/ui/Button';
+import { IconButton } from '../../components/ui/IconButton';
+import { Modal } from '../../components/ui/Modal';
+import { Input } from '../../components/ui/Input';
+import { Select } from '../../components/ui/Select';
+import { useAuth } from '../../hooks/useAuth';
 import { timeOffApi } from '../../services/api/timeoff';
-import { TimeOffRequest } from '../../types/timeoff';
+import { ApiError } from '../../services/api/client';
+import { TimeOffRequest, TimeOffAllocation, TimeOffType } from '../../types/timeoff';
 import { formatDate } from '../../utils/formatters';
 
 export const TimeOffRequestsPage: React.FC = () => {
+  const { user } = useAuth();
   const [requests, setRequests] = useState<TimeOffRequest[]>([]);
+  const [types, setTypes] = useState<TimeOffType[]>([]);
+  const [allocations, setAllocations] = useState<TimeOffAllocation[]>([]);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    async function loadData() {
-      setIsLoading(true);
-      const res = await timeOffApi.getRequests();
-      setRequests(res.data || []);
-      setIsLoading(false);
+  // Modal & Form State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [globalError, setGlobalError] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [splitWarning, setSplitWarning] = useState<{ paid: number; unpaid: number; msg: string } | null>(null);
+
+  const [timeOffTypeId, setTimeOffTypeId] = useState('');
+  const [allocationId, setAllocationId] = useState('');
+  const [dateFrom, setDateFrom] = useState(() => new Date().toISOString().split('T')[0]);
+  const [dateTo, setDateTo] = useState(() => new Date().toISOString().split('T')[0]);
+  const [reason, setReason] = useState('');
+
+  const loadData = async () => {
+    setIsLoading(true);
+    const empId = user?.employee_id ? String(user.employee_id) : undefined;
+    const [reqRes, typRes, alcRes] = await Promise.all([
+      timeOffApi.getRequests(),
+      timeOffApi.getTypes(),
+      timeOffApi.getAllocationsByEmployee(empId),
+    ]);
+    setRequests(reqRes.data || []);
+    setTypes(typRes.data || []);
+    setAllocations(alcRes.data || []);
+
+    if (typRes.data && typRes.data.length > 0 && !timeOffTypeId) {
+      setTimeOffTypeId(typRes.data[0].id);
     }
+    if (alcRes.data && alcRes.data.length > 0 && !allocationId) {
+      setAllocationId(alcRes.data[0].id);
+    }
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
     loadData();
-  }, []);
+  }, [user]);
+
+  const resetForm = () => {
+    if (types.length > 0) setTimeOffTypeId(types[0].id);
+    if (allocations.length > 0) setAllocationId(allocations[0].id);
+    setDateFrom(new Date().toISOString().split('T')[0]);
+    setDateTo(new Date().toISOString().split('T')[0]);
+    setReason('');
+    setGlobalError(null);
+    setSplitWarning(null);
+  };
+
+  const handleCreateRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!timeOffTypeId) {
+      setGlobalError('Please select a time off type.');
+      return;
+    }
+    setSubmitting(true);
+    setGlobalError(null);
+    setSplitWarning(null);
+
+    const payload: any = {
+      time_off_type: parseInt(timeOffTypeId, 10),
+      date_from: dateFrom,
+      date_to: dateTo,
+      reason: reason.trim(),
+    };
+    if (allocationId) {
+      payload.allocation = parseInt(allocationId, 10);
+    }
+
+    try {
+      const res = await timeOffApi.createRequest(payload);
+      const resObj = res.data?.data || res.data || {};
+      const unpaid = parseFloat(resObj.unpaid_duration || '0');
+      const paid = parseFloat(resObj.paid_duration || '0');
+
+      if (unpaid > 0) {
+        setSplitWarning({
+          paid,
+          unpaid,
+          msg: resObj.warning_message || `Leave balance exceeded. ${paid} day(s) allocated as paid and ${unpaid} day(s) added as Unpaid Leave.`
+        });
+        setToastMessage('Request submitted with automatic unpaid leave split!');
+      } else {
+        setToastMessage('Time off request submitted successfully!');
+        setIsModalOpen(false);
+        resetForm();
+      }
+      await loadData();
+      setTimeout(() => setToastMessage(null), 5000);
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        let msg = err.message || 'Failed to submit time off request.';
+        if (err.errors && typeof err.errors === 'object') {
+          const vals = Object.values(err.errors).flatMap((v) => (Array.isArray(v) ? v : [v]));
+          if (vals.length > 0) msg = vals.join(' ');
+        }
+        setGlobalError(msg);
+      } else {
+        setGlobalError(err?.message || 'Failed to submit time off request.');
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleApprove = async (id: string) => {
+    try {
+      await timeOffApi.approveRequest(id);
+      setToastMessage('Time off request approved!');
+      await loadData();
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (err: any) {
+      alert(err?.message || 'Failed to approve request.');
+    }
+  };
+
+  const handleRefuse = async (id: string) => {
+    try {
+      await timeOffApi.refuseRequest(id);
+      setToastMessage('Time off request refused.');
+      await loadData();
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (err: any) {
+      alert(err?.message || 'Failed to refuse request.');
+    }
+  };
 
   const filtered = (requests || []).filter(
     (r) =>
@@ -30,6 +155,15 @@ export const TimeOffRequestsPage: React.FC = () => {
       (r.reference || '').toLowerCase().includes(search.toLowerCase()) ||
       (r.timeOffTypeName || '').toLowerCase().includes(search.toLowerCase())
   );
+
+  const typeOptions = types.map((t) => ({ value: t.id, label: t.name }));
+  const allocationOptions = [
+    { value: '', label: 'Auto-detect active allocation' },
+    ...allocations.map((a) => ({
+      value: a.id,
+      label: `${a.timeOffTypeName} (${a.remainingDays} days remaining)`,
+    })),
+  ];
 
   const columns: Column<TimeOffRequest>[] = [
     {
@@ -80,6 +214,14 @@ export const TimeOffRequestsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Toast Notification Banner */}
+      {toastMessage && (
+        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-semibold flex items-center gap-3 shadow-xs">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
       <PageHeader
         title="Time Off Requests"
         subtitle="Review, approve, or refuse employee leave applications."
@@ -88,7 +230,7 @@ export const TimeOffRequestsPage: React.FC = () => {
           { label: 'Requests' },
         ]}
         actions={
-          <Button leftIcon={<Plus className="w-4 h-4" />}>
+          <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setIsModalOpen(true)}>
             Create Request
           </Button>
         }
@@ -101,7 +243,119 @@ export const TimeOffRequestsPage: React.FC = () => {
         data={filtered}
         keyExtractor={(item) => item.id}
         isLoading={isLoading}
+        actions={(item) => (
+          <div className="flex items-center gap-1.5">
+            {item.status === 'To Approve' || item.status === 'Draft' ? (
+              <>
+                <IconButton
+                  icon={<Check className="w-4 h-4 text-emerald-600" />}
+                  label="Approve leave request"
+                  onClick={() => handleApprove(item.id)}
+                />
+                <IconButton
+                  icon={<X className="w-4 h-4 text-rose-600" />}
+                  label="Refuse leave request"
+                  onClick={() => handleRefuse(item.id)}
+                />
+              </>
+            ) : null}
+          </div>
+        )}
       />
+
+      {/* New Time Off Request Modal */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => {
+          if (!submitting) {
+            setIsModalOpen(false);
+            resetForm();
+          }
+        }}
+        title="Create Time Off Request"
+        description="Apply for annual, sick, or unpaid leave."
+        maxWidth="lg"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => { setIsModalOpen(false); resetForm(); }} disabled={submitting}>
+              {splitWarning ? 'Close' : 'Cancel'}
+            </Button>
+            {!splitWarning && (
+              <Button onClick={handleCreateRequest} disabled={submitting} leftIcon={submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : undefined}>
+                {submitting ? 'Submitting...' : 'Submit Request'}
+              </Button>
+            )}
+          </>
+        }
+      >
+        <form onSubmit={handleCreateRequest} className="space-y-4 text-left">
+          {globalError && (
+            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{globalError}</span>
+            </div>
+          )}
+
+          {splitWarning && (
+            <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs space-y-2">
+              <div className="flex items-center gap-2 font-bold text-amber-900 text-sm">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                <span>Leave Balance Exceeded - Auto-Unpaid Overflow</span>
+              </div>
+              <p className="leading-relaxed font-medium">{splitWarning.msg}</p>
+              <div className="p-2.5 bg-amber-100/60 rounded-lg flex justify-between font-mono font-bold text-amber-900">
+                <span>Paid Duration: {splitWarning.paid} day(s)</span>
+                <span>Unpaid Duration: {splitWarning.unpaid} day(s)</span>
+              </div>
+            </div>
+          )}
+
+          {!splitWarning && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Select
+                  label="Leave Type *"
+                  options={typeOptions}
+                  value={timeOffTypeId}
+                  onChange={(e) => setTimeOffTypeId(e.target.value)}
+                  required
+                />
+                <Select
+                  label="Allocation Balance"
+                  options={allocationOptions}
+                  value={allocationId}
+                  onChange={(e) => setAllocationId(e.target.value)}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input
+                  label="Start Date *"
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  required
+                />
+                <Input
+                  label="End Date *"
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  required
+                />
+              </div>
+
+              <Input
+                label="Reason / Note *"
+                placeholder="Explain why you are taking leave..."
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                required
+              />
+            </>
+          )}
+        </form>
+      </Modal>
     </div>
   );
 };

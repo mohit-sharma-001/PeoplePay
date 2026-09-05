@@ -41,4 +41,20 @@ export const employeesApi = {
     const res = await apiFetch<WorkingSchedule[]>('/api/working-schedule/', {}, mockSchedules);
     return res;
   },
+
+  async create(payload: any): Promise<ApiResponse<Employee>> {
+    const res = await apiFetch<any>('/api/employees/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return { ...res, data: mapEmployee(res.data) };
+  },
+
+  async update(id: string, payload: any): Promise<ApiResponse<Employee>> {
+    const res = await apiFetch<any>(`/api/employees/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+    return { ...res, data: mapEmployee(res.data) };
+  },
 };

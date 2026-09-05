@@ -58,4 +58,20 @@ export const payrollApi = {
     const data = Array.isArray(res.data) ? res.data.map(mapSalaryRule) : mockSalaryRules;
     return { ...res, data };
   },
+
+  async createStructure(payload: any): Promise<ApiResponse<SalaryStructure>> {
+    const res = await apiFetch<any>('/api/payroll/structures/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return { ...res, data: mapSalaryStructure(res.data) };
+  },
+
+  async createRule(payload: any): Promise<ApiResponse<SalaryRule>> {
+    const res = await apiFetch<any>('/api/payroll/rules/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return { ...res, data: mapSalaryRule(res.data) };
+  },
 };

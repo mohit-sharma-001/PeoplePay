@@ -72,10 +72,25 @@ export const timeOffApi = {
     return { ...res, data };
   },
 
+  async getAllocationsByEmployee(employeeId?: string): Promise<ApiResponse<TimeOffAllocation[]>> {
+    const url = employeeId ? `/api/time-off/allocations/?employee=${employeeId}` : '/api/time-off/allocations/';
+    const res = await apiFetch<any[]>(url, {}, mockTimeOffAllocations);
+    const data = Array.isArray(res.data) ? res.data.map(mapTimeOffAllocation) : mockTimeOffAllocations;
+    return { ...res, data };
+  },
+
   async getTypes(): Promise<ApiResponse<TimeOffType[]>> {
     const res = await apiFetch<any[]>('/api/time-off/types/', {}, mockTimeOffTypes);
     const data = Array.isArray(res.data) ? res.data.map(mapTimeOffType) : mockTimeOffTypes;
     return { ...res, data };
+  },
+
+  async createRequest(payload: any): Promise<ApiResponse<any>> {
+    const res = await apiFetch<any>('/api/time-off/requests/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return res;
   },
 
   async approveRequest(id: string): Promise<ApiResponse<TimeOffRequest>> {
