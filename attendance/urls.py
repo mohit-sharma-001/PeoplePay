@@ -1,8 +1,12 @@
-from django.urls import path
-from attendance.views import attendance_index
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from attendance.views import AttendanceViewSet
 
 app_name = 'attendance'
 
+router = DefaultRouter()
+router.register(r'', AttendanceViewSet, basename='attendance')
+
 urlpatterns = [
-    path('', attendance_index, name='index'),
+    path('', include(router.urls)),
 ]

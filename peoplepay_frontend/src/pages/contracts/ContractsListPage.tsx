@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FileText, ExternalLink } from 'lucide-react';
+import { Plus, ExternalLink } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { DataTable, Column } from '../../components/shared/DataTable';
 import { SearchInput } from '../../components/shared/SearchInput';
@@ -21,17 +21,17 @@ export const ContractsListPage: React.FC = () => {
     async function loadData() {
       setIsLoading(true);
       const res = await contractsApi.getAll();
-      setContracts(res.data);
+      setContracts(res.data || []);
       setIsLoading(false);
     }
     loadData();
   }, []);
 
-  const filtered = contracts.filter(
+  const filtered = (contracts || []).filter(
     (c) =>
-      c.reference.toLowerCase().includes(search.toLowerCase()) ||
-      c.employeeName.toLowerCase().includes(search.toLowerCase()) ||
-      c.department.toLowerCase().includes(search.toLowerCase())
+      (c.reference || '').toLowerCase().includes(search.toLowerCase()) ||
+      (c.employeeName || '').toLowerCase().includes(search.toLowerCase()) ||
+      (c.department || '').toLowerCase().includes(search.toLowerCase())
   );
 
   const columns: Column<Contract>[] = [
@@ -39,7 +39,7 @@ export const ContractsListPage: React.FC = () => {
       key: 'reference',
       header: 'Contract Ref',
       sortable: true,
-      accessor: (item) => <span className="font-mono font-bold text-slate-900">{item.reference}</span>,
+      accessor: (item) => <span className="font-mono font-bold text-slate-900">{item.reference || 'CON-000'}</span>,
     },
     {
       key: 'employeeName',
@@ -47,8 +47,8 @@ export const ContractsListPage: React.FC = () => {
       sortable: true,
       accessor: (item) => (
         <div>
-          <span className="font-semibold text-slate-900 block">{item.employeeName}</span>
-          <span className="text-xs text-slate-500">{item.jobTitle}</span>
+          <span className="font-semibold text-slate-900 block">{item.employeeName || 'Employee'}</span>
+          <span className="text-xs text-slate-500">{item.jobTitle || 'Staff'}</span>
         </div>
       ),
     },
@@ -56,6 +56,7 @@ export const ContractsListPage: React.FC = () => {
       key: 'contractType',
       header: 'Type',
       sortable: true,
+      accessor: (item) => <span>{item.contractType || 'Permanent'}</span>,
     },
     {
       key: 'wage',
@@ -64,7 +65,7 @@ export const ContractsListPage: React.FC = () => {
       align: 'right',
       accessor: (item) => (
         <span className="font-bold text-slate-900">
-          {formatCurrency(item.wage)} <span className="text-xs text-slate-400 font-normal">/{item.wagePeriod}</span>
+          {formatCurrency(item.wage || 0)} <span className="text-xs text-slate-400 font-normal">/{item.wagePeriod || 'Monthly'}</span>
         </span>
       ),
     },
@@ -72,18 +73,18 @@ export const ContractsListPage: React.FC = () => {
       key: 'startDate',
       header: 'Start Date',
       sortable: true,
-      accessor: (item) => formatDate(item.startDate),
+      accessor: (item) => formatDate(item.startDate || new Date().toISOString()),
     },
     {
       key: 'salaryStructureName',
       header: 'Structure',
-      accessor: (item) => <span className="text-xs text-purple-600 font-medium">{item.salaryStructureName}</span>,
+      accessor: (item) => <span className="text-xs text-purple-600 font-medium">{item.salaryStructureName || 'Standard'}</span>,
     },
     {
       key: 'status',
       header: 'Status',
       sortable: true,
-      accessor: (item) => <StatusBadge status={item.status} />,
+      accessor: (item) => <StatusBadge status={item.status || 'Running'} />,
     },
   ];
 

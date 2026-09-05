@@ -1,8 +1,12 @@
-from django.urls import path
-from working_schedule.views import working_schedule_index
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from working_schedule.views import WorkingScheduleViewSet
 
 app_name = 'working_schedule'
 
+router = DefaultRouter()
+router.register(r'', WorkingScheduleViewSet, basename='working-schedule')
+
 urlpatterns = [
-    path('', working_schedule_index, name='index'),
+    path('', include(router.urls)),
 ]
