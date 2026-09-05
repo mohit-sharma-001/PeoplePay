@@ -168,7 +168,7 @@ export const ManageUsersPage: React.FC = () => {
           </span>
           {item.employee_id && (
             <span className="text-[11px] text-[var(--text-muted)] font-mono">
-              Emp #{item.employee_id}
+              {item.employee_code || `EMP${String(item.employee_id).padStart(4, '0')}`}
             </span>
           )}
         </div>

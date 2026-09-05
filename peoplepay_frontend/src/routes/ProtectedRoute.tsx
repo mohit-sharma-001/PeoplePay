@@ -20,13 +20,12 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (!canAccessModule(location.pathname)) {
-    return (
-      <div className="p-8 text-center bg-white rounded-xl border border-slate-200">
-        <h2 className="text-xl font-bold text-slate-900">Access Restricted</h2>
-        <p className="text-xs text-slate-500 mt-1">Your current role does not have permission to view this module.</p>
-      </div>
-    );
+  const { user } = useAuth();
+  const role = user?.role;
+  const isAdmin = role === 'Admin';
+
+  if (!canAccessModule(location.pathname) || (location.pathname.startsWith('/admin') && !isAdmin)) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;

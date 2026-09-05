@@ -22,6 +22,26 @@ function mapEmployee(apiItem: any): Employee {
     workingScheduleName: apiItem.working_schedule_name || 'Standard 40h Shift',
     contractId: `CON-${apiItem.id}`,
     user: apiItem.user !== undefined ? apiItem.user : null,
+    terminationReason: apiItem.termination_reason || undefined,
+    terminatedAt: apiItem.terminated_at || undefined,
+  };
+}
+
+function mapWorkingSchedule(apiItem: any): WorkingSchedule {
+  return {
+    id: String(apiItem.id),
+    name: apiItem.name || 'Standard Schedule',
+    flexible: apiItem.schedule_type === 'flexible' || apiItem.flexible === true,
+    hoursPerWeek: apiItem.total_weekly_hours || apiItem.hoursPerWeek || 40,
+    timeZone: 'Asia/Kolkata (IST)',
+    days: Array.isArray(apiItem.lines)
+      ? apiItem.lines.map((l: any) => ({
+          day: l.day_name || 'Day',
+          startTime: l.start_time ? l.start_time.substring(0, 5) : '09:00',
+          endTime: l.end_time ? l.end_time.substring(0, 5) : '18:00',
+          workHours: l.daily_hours || 8,
+        }))
+      : (apiItem.days || []),
   };
 }
 
@@ -39,8 +59,9 @@ export const employeesApi = {
   },
 
   async getSchedules(): Promise<ApiResponse<WorkingSchedule[]>> {
-    const res = await apiFetch<WorkingSchedule[]>('/api/working-schedule/', {}, mockSchedules);
-    return res;
+    const res = await apiFetch<any[]>('/api/working-schedule/', {}, mockSchedules);
+    const data = Array.isArray(res.data) ? res.data.map(mapWorkingSchedule) : mockSchedules;
+    return { ...res, data };
   },
 
   async create(payload: any): Promise<ApiResponse<Employee>> {
@@ -81,4 +102,20 @@ export const employeesApi = {
       }
     );
   },
+
+  async terminate(id: string, reason?: string): Promise<ApiResponse<Employee>> {
+    const res = await apiFetch<any>(`/api/employees/${id}/terminate/`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason || '' }),
+    });
+    return { ...res, data: res.data ? mapEmployee(res.data) : (null as any) };
+  },
+
+  async reactivate(id: string): Promise<ApiResponse<Employee>> {
+    const res = await apiFetch<any>(`/api/employees/${id}/reactivate/`, {
+      method: 'POST',
+    });
+    return { ...res, data: res.data ? mapEmployee(res.data) : (null as any) };
+  },
 };
+

@@ -74,4 +74,16 @@ export const payrollApi = {
     });
     return { ...res, data: mapSalaryRule(res.data) };
   },
+
+  async deleteStructure(id: string): Promise<ApiResponse<any>> {
+    return await apiFetch(`/api/payroll/structures/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+
+  async deleteRule(id: string): Promise<ApiResponse<any>> {
+    return await apiFetch(`/api/payroll/rules/${id}/`, {
+      method: 'DELETE',
+    });
+  },
 };

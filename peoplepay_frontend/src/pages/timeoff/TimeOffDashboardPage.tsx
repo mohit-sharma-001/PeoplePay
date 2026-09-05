@@ -49,7 +49,7 @@ export const TimeOffDashboardPage: React.FC = () => {
 
       {/* Summary Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card hoverable className="cursor-pointer" onClick={() => navigate('/time-off/requests')}>
+        <Card hoverable className="cursor-pointer" onClick={() => navigate('/time-off/requests?status=submitted')}>
           <CardContent className="p-5 flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pending Approvals</p>

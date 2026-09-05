@@ -17,7 +17,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'approve_payroll',
     'view_reports',
   ],
-  'HR Payroll Manager': [
+  'HR Manager': [
     'view_dashboard',
     'view_employees',
     'manage_employees',
@@ -28,6 +28,14 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'view_timeoff',
     'manage_timeoff',
     'approve_timeoff',
+    'view_reports',
+  ],
+  'HR Payroll Manager': [
+    'view_dashboard',
+    'view_employees',
+    'view_contracts',
+    'view_attendance',
+    'view_timeoff',
     'view_payroll',
     'manage_payroll',
     'approve_payroll',
@@ -43,19 +51,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'manage_payroll',
     'view_reports',
   ],
-  'HR Manager': [
-    'view_dashboard',
-    'view_employees',
-    'manage_employees',
-    'view_contracts',
-    'manage_contracts',
-    'view_attendance',
-    'manage_attendance',
-    'view_timeoff',
-    'manage_timeoff',
-    'approve_timeoff',
-    'view_reports',
-  ],
   Employee: [
     'view_dashboard',
     'view_attendance',
@@ -66,11 +61,13 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
 export const MODULE_ROUTES: Record<string, Permission> = {
   '/dashboard': 'view_dashboard',
   '/employees': 'view_employees',
+  '/schedules': 'view_employees',
   '/contracts': 'view_contracts',
   '/attendance': 'view_attendance',
   '/time-off': 'view_timeoff',
   '/payroll': 'view_payroll',
   '/reports': 'view_reports',
+  '/admin': 'view_dashboard', // Admin users check handled explicitly
 };
 
 export function hasPermission(userRole: Role | undefined | null, permission: Permission): boolean {

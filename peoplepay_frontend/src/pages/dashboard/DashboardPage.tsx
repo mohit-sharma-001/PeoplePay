@@ -5,7 +5,6 @@ import { PageHeader } from '../../components/shared/PageHeader';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { StatusBadge } from '../../components/shared/StatusBadge';
-import { OverviewCreativeBackground } from './components/OverviewCreativeBackground';
 import { employeesApi } from '../../services/api/employees';
 import { timeOffApi } from '../../services/api/timeoff';
 import { payrollApi } from '../../services/api/payroll';
@@ -25,36 +24,41 @@ export const DashboardPage: React.FC = () => {
   useEffect(() => {
     async function loadDashboardData() {
       setIsLoading(true);
-      try {
-        const [empRes, timeRes, payRes] = await Promise.all([
-          employeesApi.getAll(),
-          timeOffApi.getRequests(),
-          payrollApi.getPayruns(),
-        ]);
-        setEmployees(Array.isArray(empRes.data) ? empRes.data : []);
-        setTimeOffRequests(Array.isArray(timeRes.data) ? timeRes.data : []);
-        setPayruns(Array.isArray(payRes.data) ? payRes.data : []);
-      } catch (err) {
-        console.error('Failed to load dashboard data:', err);
-      } finally {
-        setIsLoading(false);
-      }
+      const [empRes, timeRes, payRes] = await Promise.all([
+        employeesApi.getAll().catch((err) => {
+          console.warn('Dashboard failed to load employees:', err);
+          return { data: [] };
+        }),
+        timeOffApi.getRequests().catch((err) => {
+          console.warn('Dashboard failed to load timeoff requests:', err);
+          return { data: [] };
+        }),
+        payrollApi.getPayruns().catch((err) => {
+          console.warn('Dashboard failed to load payruns:', err);
+          return { data: [] };
+        }),
+      ]);
+
+      setEmployees(Array.isArray(empRes.data) ? empRes.data : []);
+      setTimeOffRequests(Array.isArray(timeRes.data) ? timeRes.data : []);
+      setPayruns(Array.isArray(payRes.data) ? payRes.data : []);
+      setIsLoading(false);
     }
     loadDashboardData();
   }, []);
 
   const totalEmployees = (employees || []).length;
-  const activeEmployees = (employees || []).filter((e) => e.status === 'Active').length;
-  const pendingTimeOff = (timeOffRequests || []).filter((r) => r.status === 'To Approve' || r.status === 'Submitted' as any).length;
+  const activeEmployees = (employees || []).filter((e) => (e.status || '').toLowerCase() === 'active').length;
+  const pendingTimeOff = (timeOffRequests || []).filter((r) => {
+    const s = (r.status || '').toLowerCase();
+    return s === 'submitted' || s === 'to approve';
+  }).length;
   const latestPayrun = (payruns && payruns.length > 0) ? payruns[payruns.length - 1] : null;
 
   return (
-    <div className="relative space-y-6 overflow-hidden min-h-[calc(100vh-6rem)]">
-      {/* Creative Workforce Constellation & Wave Vector Background */}
-      <OverviewCreativeBackground />
-
+    <div className="space-y-6 min-h-[calc(100vh-6rem)]">
       {/* Main Foreground Content Layer */}
-      <div className="relative z-10 space-y-6">
+      <div className="space-y-6">
         <PageHeader
           title="Executive Overview"
           subtitle="Operational metrics for HR, Contracts, Time Off, and Payroll processing."
@@ -99,7 +103,7 @@ export const DashboardPage: React.FC = () => {
           </Card>
 
           {/* Pending Time Off */}
-          <Card hoverable className="cursor-pointer" onClick={() => navigate('/time-off/requests')}>
+          <Card hoverable className="cursor-pointer" onClick={() => navigate('/time-off/requests?status=submitted')}>
             <CardContent className="p-5 flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Pending Leave Req.</p>
@@ -114,28 +118,35 @@ export const DashboardPage: React.FC = () => {
 
           {/* Current Payroll Status */}
           <Card hoverable className="cursor-pointer" onClick={() => navigate('/payroll')}>
-            <CardContent className="p-5 flex items-center justify-between">
-              <div>
+            <CardContent className="p-5 space-y-2">
+              <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Current Payrun</p>
-                <div className="mt-1 flex items-center gap-2">
+                <div className="p-2 bg-[var(--brand-primary-light)] text-[var(--brand-primary)] rounded-lg">
+                  <Banknote className="w-5 h-5" />
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
                   <span className="text-base font-bold text-[var(--text-primary)]">{latestPayrun?.reference || 'PR-2026-09'}</span>
                   {latestPayrun && <StatusBadge status={latestPayrun.status} size="sm" />}
                 </div>
                 <span className="text-xs text-[var(--text-secondary)] mt-0.5 block font-semibold">
-                  {latestPayrun ? formatCurrency(latestPayrun.totalNet) : '$63,525.00'} Net
+                  {latestPayrun ? formatCurrency(latestPayrun.totalNet) : formatCurrency(63525)} Net
                 </span>
               </div>
-              <div className="p-3 bg-[var(--brand-primary-light)] text-[var(--brand-primary)] rounded-xl">
-                <Banknote className="w-6 h-6" />
+              <div className="pt-1">
+                <span className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                  Demo data — backend not yet connected
+                </span>
               </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Overview Sections Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="w-full">
           {/* Pending Requests & Approvals */}
-          <Card className="lg:col-span-2">
+          <Card className="w-full">
             <CardHeader>
               <div>
                 <CardTitle>Recent Leave Requests</CardTitle>
@@ -146,55 +157,28 @@ export const DashboardPage: React.FC = () => {
               </Button>
             </CardHeader>
             <CardContent className="p-0 divide-y divide-[var(--border-color)]">
-              {(timeOffRequests || []).slice(0, 4).map((req) => (
-                <div key={req.id} className="p-4 flex items-center justify-between hover:bg-[var(--table-row-hover)] transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-[#F59E0B]/10 text-[#F59E0B]">
-                      <Clock className="w-4 h-4" />
+              {timeOffRequests && timeOffRequests.length > 0 ? (
+                (timeOffRequests || []).slice(0, 5).map((req) => (
+                  <div key={req.id} className="p-4 flex items-center justify-between hover:bg-[var(--table-row-hover)] transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-[#F59E0B]/10 text-[#F59E0B]">
+                        <Clock className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-[var(--text-primary)]">{req.employeeName || 'Employee'}</p>
+                        <p className="text-xs text-[var(--text-secondary)]">
+                          {req.timeOffTypeName || 'Leave'} • {req.durationDays || 1} day(s) ({req.startDate || '2026-01-01'})
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold text-[var(--text-primary)]">{req.employeeName || 'Employee'}</p>
-                      <p className="text-xs text-[var(--text-secondary)]">
-                        {req.timeOffTypeName || 'Leave'} • {req.durationDays || 1} day(s) ({req.startDate || '2026-01-01'})
-                      </p>
-                    </div>
+                    <StatusBadge status={req.status || 'To Approve'} size="sm" />
                   </div>
-                  <StatusBadge status={req.status || 'To Approve'} size="sm" />
+                ))
+              ) : (
+                <div className="p-6 text-center text-xs text-[var(--text-muted)]">
+                  No leave requests found.
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          {/* System Activity Stream */}
-          <Card>
-            <CardHeader>
-              <CardTitle>System Activity</CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 space-y-4">
-              <div className="flex items-start gap-3 text-xs">
-                <div className="w-2.5 h-2.5 rounded-full bg-[var(--brand-primary)] mt-1 shrink-0" />
-                <div>
-                  <p className="font-semibold text-[var(--text-primary)]">Payrun PR-2026-08 Executed</p>
-                  <p className="text-[var(--text-secondary)]">Net payout $63,525.00 completed</p>
-                  <span className="text-[10px] text-[var(--text-muted)]">2 hours ago</span>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 text-xs">
-                <div className="w-2.5 h-2.5 rounded-full bg-emerald-600 mt-1 shrink-0" />
-                <div>
-                  <p className="font-semibold text-[var(--text-primary)]">New Employee Contract Added</p>
-                  <p className="text-[var(--text-secondary)]">Aria Montgomery (Lead UX Architect)</p>
-                  <span className="text-[10px] text-[var(--text-muted)]">1 day ago</span>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 text-xs">
-                <div className="w-2.5 h-2.5 rounded-full bg-[#F59E0B] mt-1 shrink-0" />
-                <div>
-                  <p className="font-semibold text-[var(--text-primary)]">Time Off Allocation Updated</p>
-                  <p className="text-[var(--text-secondary)]">Paid Annual Leave balances refreshed</p>
-                  <span className="text-[10px] text-[var(--text-muted)]">3 days ago</span>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </div>

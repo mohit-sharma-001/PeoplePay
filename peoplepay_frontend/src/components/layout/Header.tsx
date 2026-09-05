@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../context/ThemeContext';
 import { Avatar } from '../ui/Avatar';
 import { Dropdown } from '../ui/Dropdown';
+import { AttendanceWidget } from './AttendanceWidget';
 
 export interface HeaderProps {
   onOpenMobileSidebar: () => void;
@@ -66,6 +67,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileSidebar }) => {
             {displayRoles}
           </span>
         </div>
+
+        {/* Live Attendance Check-In / Check-Out Widget */}
+        <AttendanceWidget />
 
         <div className="h-5 w-px bg-[var(--border-color)] mx-1" />
 

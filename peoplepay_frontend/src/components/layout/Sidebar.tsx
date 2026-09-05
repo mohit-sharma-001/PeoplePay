@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../hooks/useAuth';
+import { usePermissions } from '../../hooks/usePermissions';
 import { useTheme } from '../../context/ThemeContext';
 import { Logo } from '../ui/Logo';
 
@@ -55,9 +56,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setOpenSubmenus((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const isAdmin = user?.roles?.includes('Admin') || user?.role === 'Admin';
+  const { canAccessModule } = usePermissions();
+  const userRole = user?.role || (user?.roles && user.roles[0]);
 
-  const navItems: NavItem[] = [
+  const rawNavItems: NavItem[] = [
     {
       label: 'Overview',
       path: '/dashboard',
@@ -111,7 +113,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       path: '/reports',
       icon: <BarChart3 className="w-4 h-4" />,
     },
-    ...(isAdmin
+    ...(userRole === 'Admin'
       ? [
           {
             label: 'Manage Users',
@@ -121,6 +123,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ]
       : []),
   ];
+
+  const navItems = rawNavItems.filter((item) => {
+    if (item.path === '/admin/users') return userRole === 'Admin';
+    return canAccessModule(item.path);
+  });
 
   return (
     <>

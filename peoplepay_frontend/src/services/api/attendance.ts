@@ -59,6 +59,21 @@ export const attendanceApi = {
     return { ...res, data: mapAttendance(res.data) };
   },
 
+  async getMyStatus(): Promise<ApiResponse<{ has_open_checkin: boolean; attendance: Attendance | null }>> {
+    const res = await apiFetch<any>('/api/attendance/my-status/');
+    const rawData = res.data?.data || res.data || {};
+    const has_open_checkin = Boolean(rawData.has_open_checkin);
+    const attendance = rawData.attendance ? mapAttendance(rawData.attendance) : null;
+
+    return {
+      ...res,
+      data: {
+        has_open_checkin,
+        attendance,
+      },
+    };
+  },
+
   async approveCorrection(id: string, notes?: string): Promise<ApiResponse<Attendance>> {
     const res = await apiFetch<any>(`/api/attendance/${id}/approve-correction/`, {
       method: 'POST',

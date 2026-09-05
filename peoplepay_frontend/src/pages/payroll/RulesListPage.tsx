@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { Award, Plus, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Award, Plus, CheckCircle2, AlertCircle, Loader2, Trash2 } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { DataTable, Column } from '../../components/shared/DataTable';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { IconButton } from '../../components/ui/IconButton';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
+import { useAuth } from '../../hooks/useAuth';
 import { payrollApi } from '../../services/api/payroll';
 import { ApiError } from '../../services/api/client';
 import { SalaryRule, SalaryStructure } from '../../types/payroll';
@@ -20,9 +22,8 @@ const CATEGORY_OPTIONS = [
 ];
 
 const AMOUNT_TYPE_OPTIONS = [
-  { value: 'fixed', label: 'Fixed Amount ($)' },
+  { value: 'fixed', label: 'Fixed Amount (₹)' },
   { value: 'percentage', label: 'Percentage (%)' },
-  { value: 'formula', label: 'Custom Formula' },
 ];
 
 export const RulesListPage: React.FC = () => {
@@ -35,6 +36,11 @@ export const RulesListPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Delete Modal State
+  const [deletingRule, setDeletingRule] = useState<SalaryRule | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const [structureId, setStructureId] = useState('');
   const [name, setName] = useState('');
@@ -124,6 +130,23 @@ export const RulesListPage: React.FC = () => {
     }
   };
 
+  const handleDeleteRule = async () => {
+    if (!deletingRule) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await payrollApi.deleteRule(deletingRule.id);
+      setToastMessage(`Salary Rule "${deletingRule.name}" deleted successfully.`);
+      setDeletingRule(null);
+      await loadData();
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (err: any) {
+      setDeleteError(err?.message || 'Failed to delete salary rule. It may be referenced by existing contracts or structures.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const structureOptions = structures.map((s) => ({
     value: s.id,
     label: `${s.name} (${s.code})`,
@@ -170,11 +193,14 @@ export const RulesListPage: React.FC = () => {
       accessor: (item) => (
         <span className="font-medium text-slate-700">
           {item.amountType} ({item.amountValue}
-          {item.amountType === 'Percentage' ? '%' : '$'})
+          {item.amountType === 'Percentage' ? '%' : '₹'})
         </span>
       ),
     },
   ];
+
+  const { user } = useAuth();
+  const canManagePayroll = user?.role === 'Admin' || user?.role === 'HR Payroll Manager';
 
   return (
     <div className="space-y-6">
@@ -194,9 +220,11 @@ export const RulesListPage: React.FC = () => {
           { label: 'Salary Rules' },
         ]}
         actions={
-          <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setIsModalOpen(true)}>
-            New Rule
-          </Button>
+          canManagePayroll ? (
+            <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setIsModalOpen(true)}>
+              New Rule
+            </Button>
+          ) : undefined
         }
       />
 
@@ -205,7 +233,63 @@ export const RulesListPage: React.FC = () => {
         data={rules}
         keyExtractor={(item) => item.id}
         isLoading={isLoading}
+        actions={
+          canManagePayroll ? (item) => (
+            <IconButton
+              icon={<Trash2 className="w-4 h-4 text-rose-600" />}
+              label="Delete rule"
+              onClick={() => setDeletingRule(item)}
+            />
+          ) : undefined
+        }
       />
+
+      {/* Delete Rule Confirmation Modal */}
+      <Modal
+        isOpen={!!deletingRule}
+        onClose={() => {
+          if (!isDeleting) setDeletingRule(null);
+        }}
+        title="Delete Salary Rule"
+        description="Are you sure you want to delete this? This cannot be undone."
+        maxWidth="md"
+      >
+        <div className="space-y-4 text-xs">
+          {deleteError && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+              <span>{deleteError}</span>
+            </div>
+          )}
+
+          {deletingRule && (
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg font-mono">
+              <span className="font-bold text-slate-900">{deletingRule.code}</span> — {deletingRule.name} ({deletingRule.category})
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-color)]">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setDeletingRule(null)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              isLoading={isDeleting}
+              onClick={handleDeleteRule}
+              className="bg-rose-600 hover:bg-rose-700 text-white border-transparent"
+            >
+              Confirm Delete
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* New Rule Modal */}
       <Modal
@@ -218,7 +302,7 @@ export const RulesListPage: React.FC = () => {
         }}
         title="Create Salary Rule"
         description="Configure allowance, deduction, or tax withholding formula."
-        maxWidth="lg"
+        maxWidth="2xl"
         footer={
           <>
             <Button variant="outline" onClick={() => { setIsModalOpen(false); resetForm(); }} disabled={submitting}>
@@ -289,7 +373,7 @@ export const RulesListPage: React.FC = () => {
           {/* Conditional Inputs Based on Amount Type */}
           {amountType === 'fixed' && (
             <Input
-              label="Fixed Amount ($) *"
+              label="Fixed Amount (₹) *"
               type="number"
               step="0.01"
               placeholder="e.g. 500"

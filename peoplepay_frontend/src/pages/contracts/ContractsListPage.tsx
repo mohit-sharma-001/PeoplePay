@@ -10,6 +10,7 @@ import { IconButton } from '../../components/ui/IconButton';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
+import { useAuth } from '../../hooks/useAuth';
 import { contractsApi } from '../../services/api/contracts';
 import { employeesApi } from '../../services/api/employees';
 import { ApiError } from '../../services/api/client';
@@ -26,6 +27,7 @@ const STATE_OPTIONS = [
 
 export const ContractsListPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [search, setSearch] = useState('');
@@ -227,6 +229,8 @@ export const ContractsListPage: React.FC = () => {
     },
   ];
 
+  const canManageContracts = user?.role === 'Admin' || user?.role === 'HR Manager';
+
   return (
     <div className="space-y-6">
       {/* Toast Notification Banner */}
@@ -242,9 +246,11 @@ export const ContractsListPage: React.FC = () => {
         subtitle="Manage salary agreements, contract terms, structures, and validity periods."
         breadcrumbs={[{ label: 'Contracts' }]}
         actions={
-          <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => { resetForm(); setIsModalOpen(true); }}>
-            New Contract
-          </Button>
+          canManageContracts ? (
+            <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => { resetForm(); setIsModalOpen(true); }}>
+              New Contract
+            </Button>
+          ) : undefined
         }
       />
 
@@ -258,11 +264,13 @@ export const ContractsListPage: React.FC = () => {
         onRowClick={(item) => navigate(`/contracts/${item.id}`)}
         actions={(item) => (
           <div className="flex items-center gap-1">
-            <IconButton
-              icon={<Pencil className="w-4 h-4 text-blue-600" />}
-              label="Edit contract"
-              onClick={() => handleOpenEditModal(item)}
-            />
+            {canManageContracts && (
+              <IconButton
+                icon={<Pencil className="w-4 h-4 text-blue-600" />}
+                label="Edit contract"
+                onClick={() => handleOpenEditModal(item)}
+              />
+            )}
             <IconButton
               icon={<ExternalLink className="w-4 h-4" />}
               label="View contract"
@@ -317,7 +325,7 @@ export const ContractsListPage: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
-              label="Monthly Gross Wage ($) *"
+              label="Monthly Gross Wage (₹) *"
               type="number"
               step="0.01"
               placeholder="e.g. 85000"

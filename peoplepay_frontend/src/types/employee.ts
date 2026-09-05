@@ -19,6 +19,8 @@ export interface Employee {
   workingScheduleName: string;
   contractId?: string;
   user?: { id?: number | string; username?: string } | null;
+  terminationReason?: string;
+  terminatedAt?: string;
 }
 
 export interface WorkingSchedule {

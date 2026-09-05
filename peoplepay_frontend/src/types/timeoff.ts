@@ -7,6 +7,9 @@ export interface TimeOffType {
   color: string;
   requiresApproval: boolean;
   allocationMode: 'Fixed' | 'Accrual' | 'Unlimited';
+  unit?: 'days' | 'hours';
+  isPaid?: boolean;
+  requiresAllocation?: boolean;
 }
 
 export interface TimeOffRequest {

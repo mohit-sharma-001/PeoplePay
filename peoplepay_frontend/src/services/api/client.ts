@@ -27,7 +27,7 @@ export async function apiFetch<T>(
   options: RequestInit = {},
   fallbackData?: T
 ): Promise<ApiResponse<T>> {
-  const token = localStorage.getItem('auth_token');
+  const token = localStorage.getItem('peoplepay_token') || localStorage.getItem('auth_token');
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> || {}),
@@ -66,8 +66,8 @@ export async function apiFetch<T>(
       throw new ApiError(res.status, errMsg, responseData, errDict);
     }
 
-    // Check if Django response uses envelope wrapper { status, data, message } or standard JSON array/dict
-    if (responseData && typeof responseData === 'object' && 'data' in responseData && 'status' in responseData) {
+    // Check if Django response uses envelope wrapper { success/status, data, message } or standard JSON array/dict
+    if (responseData && typeof responseData === 'object' && 'data' in responseData && ('success' in responseData || 'status' in responseData)) {
       return {
         data: responseData.data as T,
         status: res.status,

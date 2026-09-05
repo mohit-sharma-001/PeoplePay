@@ -50,12 +50,22 @@ function mapTimeOffType(apiItem: any): TimeOffType {
     color: '#3B82F6',
     requiresApproval: apiItem.requires_approval ?? true,
     allocationMode: apiItem.requires_allocation ? 'Fixed' : 'Unlimited',
+    unit: apiItem.unit || 'days',
+    isPaid: apiItem.is_paid ?? true,
+    requiresAllocation: apiItem.requires_allocation ?? true,
   };
 }
 
 export const timeOffApi = {
-  async getRequests(): Promise<ApiResponse<TimeOffRequest[]>> {
-    const res = await apiFetch<any[]>('/api/time-off/requests/', {}, mockTimeOffRequests);
+  async getRequests(params?: { status?: string; employee?: string }): Promise<ApiResponse<TimeOffRequest[]>> {
+    let url = '/api/time-off/requests/';
+    if (params) {
+      const q = new URLSearchParams();
+      if (params.status) q.append('status', params.status);
+      if (params.employee) q.append('employee', params.employee);
+      if (q.toString()) url += `?${q.toString()}`;
+    }
+    const res = await apiFetch<any[]>(url, {}, mockTimeOffRequests);
     const data = Array.isArray(res.data) ? res.data.map(mapTimeOffRequest) : mockTimeOffRequests;
     return { ...res, data };
   },
@@ -88,6 +98,35 @@ export const timeOffApi = {
     const res = await apiFetch<any[]>('/api/time-off/types/', {}, mockTimeOffTypes);
     const data = Array.isArray(res.data) ? res.data.map(mapTimeOffType) : mockTimeOffTypes;
     return { ...res, data };
+  },
+
+  async createType(payload: {
+    name: string;
+    unit: string;
+    requires_allocation: boolean;
+    is_paid: boolean;
+    requires_approval: boolean;
+  }): Promise<ApiResponse<TimeOffType>> {
+    const res = await apiFetch<any>('/api/time-off/types/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return { ...res, data: res.data ? mapTimeOffType(res.data) : (res as any) };
+  },
+
+  async bulkAllocateType(
+    typeId: string,
+    payload: {
+      allocated_amount: number;
+      valid_from: string;
+      valid_until?: string;
+    }
+  ): Promise<ApiResponse<{ created: number; skipped: number }>> {
+    const res = await apiFetch<any>(`/api/time-off/types/${typeId}/bulk-allocate/`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return res;
   },
 
   async createRequest(payload: any): Promise<ApiResponse<any>> {

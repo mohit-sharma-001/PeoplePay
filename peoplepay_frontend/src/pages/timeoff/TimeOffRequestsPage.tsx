@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, Check, X, CheckCircle2, AlertCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { DataTable, Column } from '../../components/shared/DataTable';
@@ -17,6 +18,8 @@ import { formatDate } from '../../utils/formatters';
 
 export const TimeOffRequestsPage: React.FC = () => {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const statusParam = searchParams.get('status');
   const userEmployeeId = user?.employee_id ? String(user.employee_id) : null;
   const hasEmployeeProfile = Boolean(userEmployeeId);
 
@@ -39,10 +42,12 @@ export const TimeOffRequestsPage: React.FC = () => {
   const [dateTo, setDateTo] = useState(() => new Date().toISOString().split('T')[0]);
   const [reason, setReason] = useState('');
 
+  const canApproveTimeOff = user?.role === 'Admin' || user?.role === 'HR Manager';
+
   const loadData = async () => {
     setIsLoading(true);
     const [reqRes, typRes] = await Promise.all([
-      timeOffApi.getRequests(),
+      timeOffApi.getRequests(statusParam ? { status: statusParam } : undefined),
       timeOffApi.getTypes(),
     ]);
     setRequests(reqRes.data || []);
@@ -56,7 +61,7 @@ export const TimeOffRequestsPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, [user]);
+  }, [user, statusParam]);
 
   // Auto-detect active allocation for the logged-in user's employee_id and selected leave type
   useEffect(() => {
@@ -183,12 +188,25 @@ export const TimeOffRequestsPage: React.FC = () => {
     }
   };
 
-  const filtered = (requests || []).filter(
-    (r) =>
+  const filtered = (requests || []).filter((r) => {
+    const matchesSearch =
       (r.employeeName || '').toLowerCase().includes(search.toLowerCase()) ||
       (r.reference || '').toLowerCase().includes(search.toLowerCase()) ||
-      (r.timeOffTypeName || '').toLowerCase().includes(search.toLowerCase())
-  );
+      (r.timeOffTypeName || '').toLowerCase().includes(search.toLowerCase());
+
+    if (!matchesSearch) return false;
+
+    if (statusParam) {
+      const s = (r.status || '').toLowerCase();
+      const target = statusParam.toLowerCase();
+      if (target === 'submitted' || target === 'to_approve' || target === 'to approve') {
+        return s === 'to approve' || s === 'submitted' || s === 'draft';
+      }
+      return s.includes(target);
+    }
+
+    return true;
+  });
 
   const typeOptions = types.map((t) => ({ value: String(t.id), label: t.name }));
   const allocationOptions = allocations.length > 0
@@ -286,7 +304,7 @@ export const TimeOffRequestsPage: React.FC = () => {
         data={filtered}
         keyExtractor={(item) => item.id}
         isLoading={isLoading}
-        actions={(item) => (
+        actions={canApproveTimeOff ? (item) => (
           <div className="flex items-center gap-1.5">
             {item.status === 'To Approve' || item.status === 'Draft' ? (
               <>
@@ -303,7 +321,7 @@ export const TimeOffRequestsPage: React.FC = () => {
               </>
             ) : null}
           </div>
-        )}
+        ) : undefined}
       />
 
       {/* New Time Off Request Modal */}

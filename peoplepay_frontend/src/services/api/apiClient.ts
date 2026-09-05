@@ -7,8 +7,10 @@ export function getAuthToken(): string | null {
 export function setAuthToken(token: string | null): void {
   if (token) {
     localStorage.setItem('peoplepay_token', token);
+    localStorage.setItem('auth_token', token);
   } else {
     localStorage.removeItem('peoplepay_token');
+    localStorage.removeItem('auth_token');
   }
 }
 

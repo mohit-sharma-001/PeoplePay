@@ -23,6 +23,7 @@ export interface DataTableProps<T> {
   onRowClick?: (item: T) => void;
   actions?: (item: T) => React.ReactNode;
   actionsHeader?: string;
+  rowClassName?: (item: T) => string;
 }
 
 export function DataTable<T extends Record<string, any>>({
@@ -35,6 +36,7 @@ export function DataTable<T extends Record<string, any>>({
   onRowClick,
   actions,
   actionsHeader = 'Actions',
+  rowClassName,
 }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -128,7 +130,8 @@ export function DataTable<T extends Record<string, any>>({
                   onClick={() => onRowClick && onRowClick(item)}
                   className={cn(
                     'transition-colors hover:bg-stone-50/90',
-                    onRowClick && 'cursor-pointer'
+                    onRowClick && 'cursor-pointer',
+                    rowClassName && rowClassName(item)
                   )}
                 >
                   {columns.map((col) => (

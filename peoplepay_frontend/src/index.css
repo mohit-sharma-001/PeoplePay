@@ -1,19 +1,19 @@
 @import "tailwindcss";
 
 @layer base {
-  /* DEFAULT LIGHT MODE (TARGO-INSPIRED TEAL LANDSCAPE ENVIRONMENT) */
+  /* DEFAULT LIGHT MODE — COMPLETE PURE WHITE BACKGROUND */
   :root,
   [data-theme="light"] {
-    --bg-primary: #F2F1F0;
-    --bg-surface: rgba(255, 255, 255, 0.82);
-    --bg-surface-elevated: #F7F6F8;
-    --bg-sidebar: rgba(247, 246, 248, 0.88);
-    --border-color: rgba(43, 48, 51, 0.10);
-    --border-subtle: rgba(43, 48, 51, 0.05);
+    --bg-primary: #FFFFFF;
+    --bg-surface: #FFFFFF;
+    --bg-surface-elevated: #FFFFFF;
+    --bg-sidebar: #FFFFFF;
+    --border-color: rgba(43, 48, 51, 0.12);
+    --border-subtle: rgba(43, 48, 51, 0.06);
 
-    --text-primary: #2B3033;
-    --text-secondary: #6B6F72;
-    --text-muted: #9BA0A4;
+    --text-primary: #1A1D1E;
+    --text-secondary: #525659;
+    --text-muted: #8A8F93;
 
     --brand-primary: #714B67;
     --brand-primary-hover: #5B3D54;
@@ -28,10 +28,10 @@
     --landscape-teal-hover: #3FD0EF;
     --landscape-teal-border: #0FA3C2;
 
-    --card-bg: rgba(255, 255, 255, 0.82);
-    --header-bg: rgba(242, 241, 240, 0.85);
-    --table-header-bg: rgba(247, 246, 248, 0.90);
-    --table-row-hover: rgba(242, 241, 240, 0.6);
+    --card-bg: #FFFFFF;
+    --header-bg: #FFFFFF;
+    --table-header-bg: #F8F9FA;
+    --table-row-hover: #F1F3F5;
 
     --color-success: #10B981;
     --color-warning: #F59E0B;
@@ -39,16 +39,16 @@
     --color-info: #15BCDF;
   }
 
-  /* DARK MODE */
+  /* DARK MODE — COMPLETE PURE BLACK BACKGROUND */
   [data-theme="dark"] {
-    --bg-primary: #0D0B0D;
-    --bg-surface: #171417;
-    --bg-surface-elevated: #211D20;
-    --bg-sidebar: #171417;
-    --border-color: rgba(255, 255, 255, 0.10);
-    --border-subtle: rgba(255, 255, 255, 0.05);
+    --bg-primary: #000000;
+    --bg-surface: #000000;
+    --bg-surface-elevated: #050505;
+    --bg-sidebar: #000000;
+    --border-color: rgba(255, 255, 255, 0.12);
+    --border-subtle: rgba(255, 255, 255, 0.06);
 
-    --text-primary: #F5F5F4;
+    --text-primary: #FFFFFF;
     --text-secondary: #A8A29E;
     --text-muted: #78716C;
 
@@ -61,10 +61,10 @@
     --brand-accent-hover: #D97706;
     --brand-accent-light: rgba(245, 158, 11, 0.15);
 
-    --card-bg: #171417;
-    --header-bg: #171417;
-    --table-header-bg: #211D20;
-    --table-row-hover: #262125;
+    --card-bg: #000000;
+    --header-bg: #000000;
+    --table-header-bg: #121212;
+    --table-row-hover: #1A1A1A;
 
     --color-success: #10B981;
     --color-warning: #F59E0B;

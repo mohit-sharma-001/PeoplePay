@@ -79,5 +79,6 @@ export interface ManagedUser {
   email: string;
   roles: string[];
   employee_id?: number | string;
+  employee_code?: string;
   employee_name?: string;
 }

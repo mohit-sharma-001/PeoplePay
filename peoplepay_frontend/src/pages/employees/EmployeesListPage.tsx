@@ -11,6 +11,7 @@ import { IconButton } from '../../components/ui/IconButton';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
+import { useAuth } from '../../hooks/useAuth';
 import { employeesApi } from '../../services/api/employees';
 import { ApiError } from '../../services/api/client';
 import { Employee } from '../../types/employee';
@@ -32,6 +33,8 @@ const STATUS_OPTIONS = [
 
 export const EmployeesListPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canManageEmployees = user?.role === 'Admin' || user?.role === 'HR Manager';
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -186,9 +189,11 @@ export const EmployeesListPage: React.FC = () => {
         subtitle="Manage employee records, organizational roles, contracts, and schedules."
         breadcrumbs={[{ label: 'Employees' }]}
         actions={
-          <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setIsModalOpen(true)}>
-            New Employee
-          </Button>
+          canManageEmployees ? (
+            <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setIsModalOpen(true)}>
+              New Employee
+            </Button>
+          ) : undefined
         }
       />
 
@@ -204,6 +209,7 @@ export const EmployeesListPage: React.FC = () => {
         emptyTitle="No employees found"
         emptyDescription="No employee records match your search criteria."
         onRowClick={(item) => navigate(`/employees/${item.id}`)}
+        rowClassName={(item) => (item.status === 'Terminated' ? 'bg-slate-100/70 opacity-60 hover:bg-slate-200/70' : '')}
         actions={(item) => (
           <IconButton
             icon={<ExternalLink className="w-4 h-4" />}

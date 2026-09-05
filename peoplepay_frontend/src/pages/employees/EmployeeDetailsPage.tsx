@@ -21,6 +21,8 @@ import {
   Loader2,
   Edit3,
   Shield,
+  UserX,
+  AlertOctagon,
 } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
@@ -127,10 +129,76 @@ export const EmployeeDetailsPage: React.FC = () => {
   const [isAssigningRole, setIsAssigningRole] = useState(false);
   const [changeRoleError, setChangeRoleError] = useState<string | null>(null);
 
+  // Terminate Modal State
+  const [isTerminateModalOpen, setIsTerminateModalOpen] = useState(false);
+  const [terminationReason, setTerminationReason] = useState('');
+  const [isTerminating, setIsTerminating] = useState(false);
+  const [terminateError, setTerminateError] = useState<string | null>(null);
+
+  // Reactivate Modal State
+  const [isReactivateModalOpen, setIsReactivateModalOpen] = useState(false);
+  const [isReactivating, setIsReactivating] = useState(false);
+  const [reactivateError, setReactivateError] = useState<string | null>(null);
+
   const isAdmin = Boolean(
     currentUser?.roles?.some((r) => r === 'Admin') ||
     currentUser?.role === 'Admin'
   );
+
+  const handleOpenTerminateModal = () => {
+    setTerminationReason('');
+    setTerminateError(null);
+    setIsTerminateModalOpen(true);
+  };
+
+  const handleTerminateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!employee || !id) return;
+    setIsTerminating(true);
+    setTerminateError(null);
+    try {
+      const res = await employeesApi.terminate(id, terminationReason);
+      if ((res.status && res.status >= 200 && res.status < 300) || res.data) {
+        setToastMessage('Employee terminated successfully.');
+        setIsTerminateModalOpen(false);
+        await loadEmployeeData();
+        setTimeout(() => setToastMessage(null), 4000);
+      } else {
+        setTerminateError(res.message || 'Failed to terminate employee.');
+      }
+    } catch (err: any) {
+      setTerminateError(err.message || 'An error occurred during termination.');
+    } finally {
+      setIsTerminating(false);
+    }
+  };
+
+  const handleOpenReactivateModal = () => {
+    setReactivateError(null);
+    setIsReactivateModalOpen(true);
+  };
+
+  const handleReactivateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!employee || !id) return;
+    setIsReactivating(true);
+    setReactivateError(null);
+    try {
+      const res = await employeesApi.reactivate(id);
+      if ((res.status && res.status >= 200 && res.status < 300) || res.data) {
+        setToastMessage('Employee reactivated successfully.');
+        setIsReactivateModalOpen(false);
+        await loadEmployeeData();
+        setTimeout(() => setToastMessage(null), 4000);
+      } else {
+        setReactivateError(res.message || 'Failed to reactivate employee.');
+      }
+    } catch (err: any) {
+      setReactivateError(err.message || 'An error occurred during reactivation.');
+    } finally {
+      setIsReactivating(false);
+    }
+  };
 
   const loadEmployeeData = async () => {
     setIsLoading(true);
@@ -421,6 +489,28 @@ export const EmployeeDetailsPage: React.FC = () => {
                 User Account Linked
               </span>
             )}
+            {isHRorAdmin && employee.status !== 'Terminated' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleOpenTerminateModal}
+                className="border-rose-300 text-rose-600 hover:bg-rose-50 hover:border-rose-400 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+              >
+                <UserX className="w-4 h-4 text-rose-600" />
+                Terminate
+              </Button>
+            )}
+            {isAdmin && employee.status === 'Terminated' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleOpenReactivateModal}
+                className="border-emerald-500 text-emerald-600 hover:bg-emerald-50 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+              >
+                <UserCheck className="w-4 h-4 text-emerald-600" />
+                Reactivate
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => navigate('/contracts')}>
               Manage Contract
             </Button>
@@ -473,10 +563,26 @@ export const EmployeeDetailsPage: React.FC = () => {
                   <span className="text-slate-500 font-medium">Status</span>
                   <StatusBadge status={employee.status} size="sm" />
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between border-b border-slate-100 pb-2">
                   <span className="text-slate-500 font-medium">Date Joined</span>
                   <span className="font-semibold text-slate-900">{formatDate(employee.joiningDate)}</span>
                 </div>
+                {employee.status === 'Terminated' && (
+                  <>
+                    {employee.terminatedAt && (
+                      <div className="flex justify-between border-b border-slate-100 pb-2">
+                        <span className="text-slate-500 font-medium">Terminated On</span>
+                        <span className="font-semibold text-rose-700">{formatDate(employee.terminatedAt)}</span>
+                      </div>
+                    )}
+                    {employee.terminationReason && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 font-medium">Reason</span>
+                        <span className="font-medium text-slate-800 italic">{employee.terminationReason}</span>
+                      </div>
+                    )}
+                  </>
+                )}
               </CardContent>
             </Card>
 
@@ -979,6 +1085,112 @@ export const EmployeeDetailsPage: React.FC = () => {
               onChange={(e) => setStatusVal(e.target.value)}
               error={fieldErrors.status}
             />
+          </div>
+        </form>
+      </Modal>
+
+      {/* Terminate Employee Modal */}
+      <Modal
+        isOpen={isTerminateModalOpen}
+        onClose={() => {
+          if (!isTerminating) setIsTerminateModalOpen(false);
+        }}
+        title="Terminate Employee"
+        description={`Process employment termination for ${employee.firstName} ${employee.lastName}`}
+        maxWidth="md"
+      >
+        <form onSubmit={handleTerminateSubmit} className="space-y-4 text-xs">
+          {terminateError && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+              <span>{terminateError}</span>
+            </div>
+          )}
+
+          <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg text-xs leading-relaxed flex items-start gap-2.5">
+            <AlertOctagon className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-amber-900 mb-0.5">Warning: Sensitive Action</p>
+              <p>
+                This will close the employee's active contract and disable their login. This action should only be used when the employee is leaving the company.
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <label className="block font-medium text-[var(--text-primary)] mb-1">Termination Reason (Optional)</label>
+            <textarea
+              rows={3}
+              value={terminationReason}
+              onChange={(e) => setTerminationReason(e.target.value)}
+              placeholder="Provide a brief explanation or reason for termination..."
+              className="w-full px-3 py-2 bg-[var(--bg-surface)] text-[var(--text-primary)] border border-[var(--border-color)] rounded-lg focus:outline-hidden focus:ring-2 focus:ring-rose-500"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-color)]">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsTerminateModalOpen(false)}
+              disabled={isTerminating}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              size="sm"
+              isLoading={isTerminating}
+              className="bg-rose-600 hover:bg-rose-700 text-white border-transparent"
+            >
+              Confirm Termination
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Reactivate Employee Modal */}
+      <Modal
+        isOpen={isReactivateModalOpen}
+        onClose={() => {
+          if (!isReactivating) setIsReactivateModalOpen(false);
+        }}
+        title="Reactivate Employee"
+        description={`Restore active status for ${employee.firstName} ${employee.lastName}`}
+        maxWidth="md"
+      >
+        <form onSubmit={handleReactivateSubmit} className="space-y-4 text-xs">
+          {reactivateError && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+              <span>{reactivateError}</span>
+            </div>
+          )}
+
+          <div className="p-3 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg text-xs leading-relaxed flex items-start gap-2.5">
+            <AlertCircle className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-blue-900 mb-0.5">Reactivation Info</p>
+              <p>
+                This will restore the employee's active status and re-enable their portal login account (if one exists). Old contracts will remain closed history — a new contract must be created separately if required.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-color)]">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsReactivateModalOpen(false)}
+              disabled={isReactivating}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" size="sm" isLoading={isReactivating}>
+              Confirm Reactivation
+            </Button>
           </div>
         </form>
       </Modal>
