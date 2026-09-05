@@ -18,6 +18,7 @@ export interface Employee {
   workingScheduleId: string;
   workingScheduleName: string;
   contractId?: string;
+  user?: { id?: number | string; username?: string } | null;
 }
 
 export interface WorkingSchedule {

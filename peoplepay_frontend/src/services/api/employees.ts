@@ -21,6 +21,7 @@ function mapEmployee(apiItem: any): Employee {
     workingScheduleId: apiItem.working_schedule ? String(apiItem.working_schedule) : '1',
     workingScheduleName: apiItem.working_schedule_name || 'Standard 40h Shift',
     contractId: `CON-${apiItem.id}`,
+    user: apiItem.user !== undefined ? apiItem.user : null,
   };
 }
 
@@ -40,5 +41,28 @@ export const employeesApi = {
   async getSchedules(): Promise<ApiResponse<WorkingSchedule[]>> {
     const res = await apiFetch<WorkingSchedule[]>('/api/working-schedule/', {}, mockSchedules);
     return res;
+  },
+
+  async createLogin(
+    employeeId: string,
+    payload: { username: string; password: string }
+  ): Promise<ApiResponse<any>> {
+    return await apiFetch<any>(
+      `/api/employees/${employeeId}/create-login/`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      {
+        success: true,
+        message: 'Login credentials created successfully.',
+        data: {
+          id: Date.now(),
+          username: payload.username,
+          employee_id: Number(employeeId),
+        },
+      }
+    );
   },
 };

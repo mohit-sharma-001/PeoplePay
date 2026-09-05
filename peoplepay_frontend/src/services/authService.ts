@@ -12,10 +12,8 @@ export interface AuthResponse {
   user?: User;
   token?: string;
   error?: string;
-  token?: string;
 }
 
-<<<<<<< HEAD
 let inMemoryUsers: ManagedUser[] = mockUsers.map((u, idx) => ({
   id: idx + 1,
   username: u.email.split('@')[0],
@@ -24,22 +22,13 @@ let inMemoryUsers: ManagedUser[] = mockUsers.map((u, idx) => ({
   employee_id: idx + 10,
   employee_name: u.name,
 }));
-=======
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
->>>>>>> 3c686d5577c2e4e2ac7d67230c829477e532fedb
 
 export const authService = {
   login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
     const identifier = credentials.emailOrUsername.trim();
-<<<<<<< HEAD
-=======
-    const password = credentials.password?.trim() || 'password123';
-
->>>>>>> 3c686d5577c2e4e2ac7d67230c829477e532fedb
     if (!identifier) {
       return { success: false, error: 'Please enter your username or email.' };
     }
-<<<<<<< HEAD
     if (!credentials.password || !credentials.password.trim()) {
       return { success: false, error: 'Please enter your password.' };
     }
@@ -90,60 +79,14 @@ export const authService = {
     }
 
     // Fallback mock authentication if backend API server is offline/unreachable
-=======
-
-    try {
-      // Attempt real backend authentication first
-      const res = await fetch(`${API_BASE_URL}/api/auth/login/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: identifier,
-          password: password,
-        }),
-      });
-
-      if (res.ok) {
-        const resData = await res.json();
-        const token = resData.data?.token || resData.token;
-        const apiUser = resData.data?.user || resData.user;
-
-        if (token && apiUser) {
-          localStorage.setItem('auth_token', token);
-
-          const roleName = (apiUser.roles && apiUser.roles.length > 0) ? apiUser.roles[0] : 'Admin';
-          const frontendUser: User = {
-            id: String(apiUser.id),
-            name: `${apiUser.first_name} ${apiUser.last_name}`.trim() || apiUser.username,
-            email: apiUser.email || `${apiUser.username}@peoplepay360.com`,
-            role: roleName,
-            department: 'Engineering',
-            employeeId: apiUser.employee_id ? `EMP${String(apiUser.employee_id).padStart(4, '0')}` : 'EMP0001',
-          };
-
-          localStorage.setItem('auth_user', JSON.stringify(frontendUser));
-          return { success: true, user: frontendUser, token };
-        }
-      }
-    } catch (e) {
-      console.warn('Real backend authentication failed, attempting mock fallback:', e);
-    }
-
-    // Fallback to local mock authentication if backend is unreachable or demo credentials used
->>>>>>> 3c686d5577c2e4e2ac7d67230c829477e532fedb
     const matchedUser = mockUsers.find(
       (u) =>
         u.email.toLowerCase() === identifier.toLowerCase() ||
         u.name.toLowerCase().includes(identifier.toLowerCase()) ||
-<<<<<<< HEAD
         String(u.id).toLowerCase() === identifier.toLowerCase()
-=======
-        u.id.toLowerCase() === identifier.toLowerCase()
->>>>>>> 3c686d5577c2e4e2ac7d67230c829477e532fedb
     ) || {
       id: `usr-${Date.now()}`,
       name: identifier.includes('@') ? identifier.split('@')[0] : identifier,
-<<<<<<< HEAD
       email: identifier.includes('@') ? identifier : `${identifier}@peoplepay360.io`,
       role: 'Employee' as Role,
       roles: ['Employee'],
@@ -167,22 +110,6 @@ export const authService = {
       success: true,
       user: finalUser,
       token,
-=======
-      email: identifier.includes('@') ? identifier : `${identifier}@peoplepay360.com`,
-      role: 'Admin' as const,
-      department: 'Executive',
-      employeeId: 'EMP0001',
-    };
-
-    const mockToken = `mock_token_${Date.now()}`;
-    localStorage.setItem('auth_token', mockToken);
-    localStorage.setItem('auth_user', JSON.stringify(matchedUser));
-
-    return {
-      success: true,
-      user: matchedUser,
-      token: mockToken,
->>>>>>> 3c686d5577c2e4e2ac7d67230c829477e532fedb
     };
   },
 
@@ -378,7 +305,6 @@ export const authService = {
   },
 
   logout: (): void => {
-<<<<<<< HEAD
     setAuthToken(null);
     setStoredUser(null);
   },
@@ -389,35 +315,5 @@ export const authService = {
 
   isAuthenticated: (): boolean => {
     return !!getStoredUser() && !!getAuthToken();
-=======
-    const token = localStorage.getItem('auth_token');
-    if (token && !token.startsWith('mock_token_')) {
-      fetch(`${API_BASE_URL}/api/auth/logout/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Token ${token}`,
-        },
-      }).catch(() => {});
-    }
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_user');
-  },
-
-  getCurrentUser: (): User | null => {
-    const stored = localStorage.getItem('auth_user');
-    if (stored) {
-      try {
-        return JSON.parse(stored);
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  },
-
-  isAuthenticated: (): boolean => {
-    return !!localStorage.getItem('auth_token');
->>>>>>> 3c686d5577c2e4e2ac7d67230c829477e532fedb
   },
 };
