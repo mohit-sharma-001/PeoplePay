@@ -323,7 +323,138 @@ EXPECTED RESPONSE (HTTP 200 OK):
 }
 
 -------------------------------------------------------------------------------
-STEP 10: USER LOGOUT & TOKEN INVALIDATION
+STEP 10: CREATE TIME OFF TYPE
+-------------------------------------------------------------------------------
+FEATURE TESTED:
+Leave Category Configuration (/api/time-off/types/). Configures leave policies
+(e.g., Paid Time Off, Sick Leave, Unpaid Leave) with unit tracking and approval options.
+
+RUNNING COMMAND:
+curl -X POST http://127.0.0.1:8000/api/time-off/types/ \
+  -H "Authorization: Token ca9807b61fb9affe3ab6bf02fd6dcf529b73558e" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Casual Leave",
+    "unit": "days",
+    "requires_allocation": true,
+    "is_paid": true,
+    "requires_approval": true
+  }'
+
+EXPECTED RESPONSE (HTTP 201 Created):
+{
+  "id": 4,
+  "name": "Casual Leave",
+  "unit": "days",
+  "requires_allocation": true,
+  "is_paid": true,
+  "requires_approval": true
+}
+
+-------------------------------------------------------------------------------
+STEP 11: CREATE TIME OFF ALLOCATION FOR EMPLOYEE
+-------------------------------------------------------------------------------
+FEATURE TESTED:
+Employee Leave Balance Allocation (/api/time-off/allocations/). Grants a leave quota
+(e.g. 15.0 days) to an employee with valid date range and state ('confirmed'). Exposes
+computed read-only fields 'used_amount' (0.0) and 'remaining_amount' (15.0).
+
+RUNNING COMMAND:
+curl -X POST http://127.0.0.1:8000/api/time-off/allocations/ \
+  -H "Authorization: Token ca9807b61fb9affe3ab6bf02fd6dcf529b73558e" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "employee": 1,
+    "time_off_type": 4,
+    "allocated_amount": "15.00",
+    "valid_from": "2026-01-01",
+    "valid_until": "2026-12-31",
+    "state": "confirmed"
+  }'
+
+EXPECTED RESPONSE (HTTP 201 Created):
+{
+  "id": 17,
+  "employee": 1,
+  "employee_name": "John Doe",
+  "time_off_type": 4,
+  "time_off_type_name": "Casual Leave",
+  "allocated_amount": "15.00",
+  "used_amount": 0.0,
+  "remaining_amount": 15.0,
+  "valid_from": "2026-01-01",
+  "valid_until": "2026-12-31",
+  "state": "confirmed"
+}
+
+-------------------------------------------------------------------------------
+STEP 12: SUBMIT OVER-LIMIT TIME OFF REQUEST WITH AUTO-UNPAID WARNING
+-------------------------------------------------------------------------------
+FEATURE TESTED:
+Auto-Unpaid Overflow & Warning Message (/api/time-off/requests/).
+When an employee requests 5 days but only has 3 days Paid PTO remaining:
+1. Calculates paid_duration (3.0) and unpaid_duration (2.0).
+2. Generates user warning_message explaining that 2 days will auto-convert to Unpaid Leave.
+3. Includes mandatory leave note reason explaining why the employee wants leave.
+
+RUNNING COMMAND (5-Day Request with 3-Day PTO Balance):
+curl -X POST http://127.0.0.1:8000/api/time-off/requests/ \
+  -H "Authorization: Token ca9807b61fb9affe3ab6bf02fd6dcf529b73558e" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "employee": 1,
+    "time_off_type": 1,
+    "allocation": 1,
+    "date_from": "2026-10-01",
+    "date_to": "2026-10-05",
+    "reason": "Family trip - requesting 5 days total"
+  }'
+
+EXPECTED RESPONSE (HTTP 201 Created):
+{
+  "id": 6,
+  "employee": 1,
+  "employee_name": "Rajesh Sharma",
+  "time_off_type": 1,
+  "time_off_type_name": "Paid Time Off",
+  "duration": 5,
+  "paid_duration": 3.0,
+  "unpaid_duration": 2.0,
+  "warning_message": "3.0 day(s) will be covered by Paid Time Off. The remaining 2.0 day(s) will automatically convert to Unpaid Leave upon approval.",
+  "status": "submitted",
+  "reason": "Family trip - requesting 5 days total"
+}
+
+-------------------------------------------------------------------------------
+STEP 13: APPROVE OVER-LIMIT REQUEST & AUTO-CREATE UNPAID LEAVE OVERFLOW
+-------------------------------------------------------------------------------
+FEATURE TESTED:
+Manager Approval of Over-Limit Leave (/api/time-off/requests/{id}/approve/).
+When manager approves request #6 (3 paid + 2 unpaid):
+1. Deducts 3 days from PTO allocation (reducing PTO balance to 0).
+2. Automatically creates and approves a linked Unpaid Leave record for 2 days.
+
+RUNNING COMMAND:
+curl -X POST http://127.0.0.1:8000/api/time-off/requests/6/approve/ \
+  -H "Authorization: Token ca9807b61fb9affe3ab6bf02fd6dcf529b73558e" \
+  -H "Content-Type: application/json"
+
+EXPECTED RESPONSE (HTTP 200 OK):
+{
+  "status": "success",
+  "message": "Time off request approved successfully. (3.0 days paid PTO + 2.0 days auto-converted to Unpaid Leave).",
+  "data": {
+    "id": 6,
+    "status": "approved",
+    "duration": 5,
+    "paid_duration": 3.0,
+    "unpaid_duration": 2.0,
+    "overflow_unpaid_request": 7
+  }
+}
+
+-------------------------------------------------------------------------------
+STEP 14: USER LOGOUT & TOKEN INVALIDATION
 -------------------------------------------------------------------------------
 FEATURE TESTED:
 Authentication Logout (/api/auth/logout/). Invalidates and deletes the active Auth Token.

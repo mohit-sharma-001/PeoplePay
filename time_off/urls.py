@@ -1,8 +1,18 @@
-from django.urls import path
-from time_off.views import time_off_index
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from time_off.views import (
+    TimeOffTypeViewSet,
+    TimeOffAllocationViewSet,
+    TimeOffRequestViewSet,
+)
 
 app_name = 'time_off'
 
+router = DefaultRouter()
+router.register(r'types', TimeOffTypeViewSet, basename='time-off-types')
+router.register(r'allocations', TimeOffAllocationViewSet, basename='time-off-allocations')
+router.register(r'requests', TimeOffRequestViewSet, basename='time-off-requests')
+
 urlpatterns = [
-    path('', time_off_index, name='index'),
+    path('', include(router.urls)),
 ]
