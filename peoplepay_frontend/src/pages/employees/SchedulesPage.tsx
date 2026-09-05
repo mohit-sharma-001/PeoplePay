@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, Clock, Plus, Edit3, Trash2, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Clock, Plus, Edit3, Trash2, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
