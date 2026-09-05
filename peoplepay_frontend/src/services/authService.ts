@@ -26,10 +26,12 @@ let inMemoryUsers: ManagedUser[] = mockUsers.map((u, idx) => ({
 export const authService = {
   login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
     const identifier = credentials.emailOrUsername.trim();
+    const password = credentials.password?.trim() || '';
+
     if (!identifier) {
       return { success: false, error: 'Please enter your username or email.' };
     }
-    if (!credentials.password || !credentials.password.trim()) {
+    if (!password) {
       return { success: false, error: 'Please enter your password.' };
     }
 
@@ -38,8 +40,7 @@ export const authService = {
       method: 'POST',
       body: JSON.stringify({
         username: identifier,
-        email: identifier,
-        password: credentials.password,
+        password: password,
       }),
     });
 

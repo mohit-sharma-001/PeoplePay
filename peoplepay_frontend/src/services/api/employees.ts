@@ -43,6 +43,22 @@ export const employeesApi = {
     return res;
   },
 
+  async create(payload: any): Promise<ApiResponse<Employee>> {
+    const res = await apiFetch<any>('/api/employees/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return { ...res, data: mapEmployee(res.data) };
+  },
+
+  async update(id: string, payload: any): Promise<ApiResponse<Employee>> {
+    const res = await apiFetch<any>(`/api/employees/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+    return { ...res, data: mapEmployee(res.data) };
+  },
+
   async createLogin(
     employeeId: string,
     payload: { username: string; password: string }
@@ -55,13 +71,13 @@ export const employeesApi = {
         body: JSON.stringify(payload),
       },
       {
-        success: true,
-        message: 'Login credentials created successfully.',
         data: {
           id: Date.now(),
           username: payload.username,
           employee_id: Number(employeeId),
         },
+        status: 201,
+        message: 'Login credentials created successfully.',
       }
     );
   },

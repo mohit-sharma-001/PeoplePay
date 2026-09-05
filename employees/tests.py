@@ -115,3 +115,61 @@ class EmployeeAPITestCase(TestCase):
         }
         response = self.client.post('/api/employees/', payload, format='json')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_create_login_already_has_user_returns_400(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            f'/api/employees/{self.employee.id}/create-login/',
+            {'username': 'newlogin', 'password': 'Password123!'},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['detail'], "This employee already has a login account.")
+
+    def test_create_login_non_admin_hr_returns_403(self):
+        emp_no_user = Employee.objects.create(
+            first_name='Unlinked',
+            last_name='Employee',
+            email='unlinked@example.com',
+            department=Employee.Department.ENGINEERING,
+            job_position='Software Engineer',
+            date_joined=date(2026, 1, 1)
+        )
+        plain_emp_user = User.objects.create_user(username='plainuser_login', password='Password123!')
+        plain_emp_user.groups.add(self.emp_group)
+
+        self.client.force_authenticate(user=plain_emp_user)
+        response = self.client.post(
+            f'/api/employees/{emp_no_user.id}/create-login/',
+            {'username': 'newlogin2', 'password': 'Password123!'},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_create_login_success(self):
+        emp_no_user = Employee.objects.create(
+            first_name='Unlinked2',
+            last_name='Employee2',
+            email='unlinked2@example.com',
+            department=Employee.Department.ENGINEERING,
+            job_position='DevOps Specialist',
+            date_joined=date(2026, 1, 1)
+        )
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            f'/api/employees/{emp_no_user.id}/create-login/',
+            {'username': 'newlogin3', 'password': 'Password123!'},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn('id', response.data)
+        self.assertEqual(response.data['username'], 'newlogin3')
+        self.assertIn('Employee', response.data['roles'])
+        self.assertNotIn('password', response.data)
+
+        emp_no_user.refresh_from_db()
+        self.assertIsNotNone(emp_no_user.user)
+        self.assertEqual(emp_no_user.user.username, 'newlogin3')
+        self.assertTrue(emp_no_user.user.check_password('Password123!'))
+        self.assertTrue(emp_no_user.user.groups.filter(name='Employee').exists())
+

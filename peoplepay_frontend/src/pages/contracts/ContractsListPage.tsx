@@ -1,31 +1,163 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, ExternalLink } from 'lucide-react';
+import { Plus, ExternalLink, Pencil, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { DataTable, Column } from '../../components/shared/DataTable';
 import { SearchInput } from '../../components/shared/SearchInput';
 import { StatusBadge } from '../../components/shared/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { IconButton } from '../../components/ui/IconButton';
+import { Modal } from '../../components/ui/Modal';
+import { Input } from '../../components/ui/Input';
+import { Select } from '../../components/ui/Select';
 import { contractsApi } from '../../services/api/contracts';
+import { employeesApi } from '../../services/api/employees';
+import { ApiError } from '../../services/api/client';
 import { Contract } from '../../types/contract';
+import { Employee } from '../../types/employee';
 import { formatDate, formatCurrency } from '../../utils/formatters';
+
+const STATE_OPTIONS = [
+  { value: 'draft', label: 'Draft' },
+  { value: 'running', label: 'Running' },
+  { value: 'expired', label: 'Expired' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
 
 export const ContractsListPage: React.FC = () => {
   const navigate = useNavigate();
   const [contracts, setContracts] = useState<Contract[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    async function loadData() {
-      setIsLoading(true);
-      const res = await contractsApi.getAll();
-      setContracts(res.data || []);
-      setIsLoading(false);
+  // Modal & Form State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingContract, setEditingContract] = useState<Contract | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [globalError, setGlobalError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const [employeeId, setEmployeeId] = useState('');
+  const [wage, setWage] = useState('');
+  const [dateStart, setDateStart] = useState(() => new Date().toISOString().split('T')[0]);
+  const [dateEnd, setDateEnd] = useState('');
+  const [stateVal, setStateVal] = useState('running');
+  const [department, setDepartment] = useState('Engineering');
+  const [jobPosition, setJobPosition] = useState('Software Engineer');
+
+  const loadData = async () => {
+    setIsLoading(true);
+    const [cRes, eRes] = await Promise.all([
+      contractsApi.getAll(),
+      employeesApi.getAll(),
+    ]);
+    setContracts(cRes.data || []);
+    setEmployees(eRes.data || []);
+    if (eRes.data && eRes.data.length > 0 && !employeeId) {
+      setEmployeeId(eRes.data[0].id);
+      setDepartment(eRes.data[0].department || 'Engineering');
+      setJobPosition(eRes.data[0].jobTitle || 'Software Engineer');
     }
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
     loadData();
   }, []);
+
+  const handleEmployeeChange = (selectedId: string) => {
+    setEmployeeId(selectedId);
+    const emp = employees.find((e) => e.id === selectedId);
+    if (emp) {
+      setDepartment(emp.department || 'Engineering');
+      setJobPosition(emp.jobTitle || 'Software Engineer');
+    }
+  };
+
+  const resetForm = () => {
+    setEditingContract(null);
+    if (employees.length > 0) {
+      setEmployeeId(employees[0].id);
+      setDepartment(employees[0].department || 'Engineering');
+      setJobPosition(employees[0].jobTitle || 'Software Engineer');
+    }
+    setWage('');
+    setDateStart(new Date().toISOString().split('T')[0]);
+    setDateEnd('');
+    setStateVal('running');
+    setFieldErrors({});
+    setGlobalError(null);
+  };
+
+  const handleOpenEditModal = (c: Contract) => {
+    setEditingContract(c);
+    setEmployeeId(c.employeeId);
+    setWage(String(c.wage || ''));
+    setDateStart(c.startDate ? c.startDate.split('T')[0] : new Date().toISOString().split('T')[0]);
+    setDateEnd(c.endDate ? c.endDate.split('T')[0] : '');
+    setStateVal((c.status || 'Running').toLowerCase());
+    setDepartment(c.department || 'Engineering');
+    setJobPosition(c.jobTitle || 'Software Engineer');
+    setFieldErrors({});
+    setGlobalError(null);
+    setIsModalOpen(true);
+  };
+
+  const handleSaveContract = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!employeeId) {
+      setGlobalError('Please select an employee.');
+      return;
+    }
+    setSubmitting(true);
+    setFieldErrors({});
+    setGlobalError(null);
+
+    const payload = {
+      employee: parseInt(employeeId, 10),
+      wage: parseFloat(wage),
+      date_start: dateStart,
+      date_end: dateEnd ? dateEnd : null,
+      state: stateVal,
+      department,
+      job_position: jobPosition,
+    };
+
+    try {
+      if (editingContract) {
+        await contractsApi.update(editingContract.id, payload);
+        setToastMessage('Contract updated successfully!');
+      } else {
+        await contractsApi.create(payload);
+        setToastMessage('Contract created successfully!');
+      }
+      setIsModalOpen(false);
+      resetForm();
+      await loadData();
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        let msg = err.message || (editingContract ? 'Failed to update contract.' : 'Failed to create contract.');
+        if (err.errors) {
+          if (typeof err.errors === 'string') {
+            msg = err.errors;
+          } else if (typeof err.errors === 'object') {
+            const errValues = Object.values(err.errors).flatMap((v) => (Array.isArray(v) ? v : [v]));
+            if (errValues.length > 0) {
+              msg = errValues.join(' ');
+            }
+          }
+        }
+        setGlobalError(msg);
+      } else {
+        setGlobalError(err?.message || 'Failed to save contract.');
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const filtered = (contracts || []).filter(
     (c) =>
@@ -33,6 +165,11 @@ export const ContractsListPage: React.FC = () => {
       (c.employeeName || '').toLowerCase().includes(search.toLowerCase()) ||
       (c.department || '').toLowerCase().includes(search.toLowerCase())
   );
+
+  const employeeOptions = employees.map((e) => ({
+    value: e.id,
+    label: `${e.firstName} ${e.lastName} (${e.code})`,
+  }));
 
   const columns: Column<Contract>[] = [
     {
@@ -90,12 +227,20 @@ export const ContractsListPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Toast Notification Banner */}
+      {toastMessage && (
+        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-semibold flex items-center gap-3 shadow-xs">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
       <PageHeader
         title="Employment Contracts"
         subtitle="Manage salary agreements, contract terms, structures, and validity periods."
         breadcrumbs={[{ label: 'Contracts' }]}
         actions={
-          <Button leftIcon={<Plus className="w-4 h-4" />}>
+          <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => { resetForm(); setIsModalOpen(true); }}>
             New Contract
           </Button>
         }
@@ -110,13 +255,117 @@ export const ContractsListPage: React.FC = () => {
         isLoading={isLoading}
         onRowClick={(item) => navigate(`/contracts/${item.id}`)}
         actions={(item) => (
-          <IconButton
-            icon={<ExternalLink className="w-4 h-4" />}
-            label="View contract"
-            onClick={() => navigate(`/contracts/${item.id}`)}
-          />
+          <div className="flex items-center gap-1">
+            <IconButton
+              icon={<Pencil className="w-4 h-4 text-blue-600" />}
+              label="Edit contract"
+              onClick={() => handleOpenEditModal(item)}
+            />
+            <IconButton
+              icon={<ExternalLink className="w-4 h-4" />}
+              label="View contract"
+              onClick={() => navigate(`/contracts/${item.id}`)}
+            />
+          </div>
         )}
       />
+
+      {/* Create / Edit Contract Modal */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => {
+          if (!submitting) {
+            setIsModalOpen(false);
+            resetForm();
+          }
+        }}
+        title={editingContract ? 'Edit Employment Contract' : 'Create New Contract'}
+        description={editingContract ? 'Update salary terms and employment contract period.' : 'Assign salary terms and employment contract period to an employee.'}
+        maxWidth="lg"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => { setIsModalOpen(false); resetForm(); }} disabled={submitting}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveContract} disabled={submitting} leftIcon={submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : undefined}>
+              {submitting ? 'Saving...' : editingContract ? 'Update Contract' : 'Create Contract'}
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleSaveContract} className="space-y-4 text-left">
+          {globalError && (
+            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-start gap-2.5 shadow-xs">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
+              <div className="leading-relaxed">
+                <span className="font-bold block text-rose-800 uppercase tracking-wider text-[11px] mb-0.5">Contract Error</span>
+                <span>{globalError}</span>
+              </div>
+            </div>
+          )}
+
+          <Select
+            label="Employee *"
+            options={employeeOptions}
+            value={employeeId}
+            onChange={(e) => handleEmployeeChange(e.target.value)}
+            disabled={!!editingContract}
+            required
+          />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Monthly Gross Wage ($) *"
+              type="number"
+              step="0.01"
+              placeholder="e.g. 85000"
+              value={wage}
+              onChange={(e) => setWage(e.target.value)}
+              error={fieldErrors.wage}
+              required
+            />
+            <Select
+              label="Contract State *"
+              options={STATE_OPTIONS}
+              value={stateVal}
+              onChange={(e) => setStateVal(e.target.value)}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Start Date *"
+              type="date"
+              value={dateStart}
+              onChange={(e) => setDateStart(e.target.value)}
+              error={fieldErrors.date_start}
+              required
+            />
+            <Input
+              label="End Date (Optional)"
+              type="date"
+              value={dateEnd}
+              onChange={(e) => setDateEnd(e.target.value)}
+              error={fieldErrors.date_end}
+              helperText="Leave blank for permanent / indefinite contracts"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Department"
+              value={department}
+              onChange={(e) => setDepartment(e.target.value)}
+            />
+            <Input
+              label="Job Position"
+              value={jobPosition}
+              onChange={(e) => setJobPosition(e.target.value)}
+            />
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };
+

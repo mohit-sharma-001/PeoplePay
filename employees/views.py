@@ -1,4 +1,7 @@
-from rest_framework import viewsets, filters, permissions
+from rest_framework import viewsets, filters, permissions, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from django.contrib.auth.models import User, Group
 from core.permissions import HasRole, is_employee_only
 from employees.models import Employee
 from employees.serializers import EmployeeSerializer
@@ -21,6 +24,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         'update': ['Admin', 'HR Manager'],
         'partial_update': ['Admin', 'HR Manager'],
         'destroy': ['Admin', 'HR Manager'],
+        'create_login': ['Admin', 'HR Manager'],
     }
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['first_name', 'last_name', 'employee_code', 'email', 'job_position']
@@ -46,3 +50,53 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(status__iexact=status)
 
         return queryset
+
+    @action(detail=True, methods=['post'], url_path='create-login')
+    def create_login(self, request, pk=None):
+        """
+        Create a login User account for an Employee and link it via employee.user.
+        Restricted to Admin and HR Manager.
+        """
+        employee = self.get_object()
+
+        if employee.user:
+            return Response(
+                {"detail": "This employee already has a login account."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        username = request.data.get('username')
+        password = request.data.get('password')
+
+        if not username or not password:
+            return Response(
+                {"detail": "Both username and password are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if User.objects.filter(username=username).exists():
+            return Response(
+                {"username": ["A user with that username already exists."]},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user = User.objects.create_user(
+            username=username,
+            password=password,
+            email=employee.email,
+            first_name=employee.first_name,
+            last_name=employee.last_name
+        )
+        employee.user = user
+        employee.save(update_fields=['user'])
+
+        emp_group, _ = Group.objects.get_or_create(name='Employee')
+        user.groups.add(emp_group)
+
+        roles = list(user.groups.values_list('name', flat=True))
+        return Response({
+            "id": user.id,
+            "username": user.username,
+            "roles": roles,
+        }, status=status.HTTP_201_CREATED)
+

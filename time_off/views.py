@@ -124,6 +124,15 @@ class TimeOffRequestViewSet(viewsets.ModelViewSet):
 
         return queryset
 
+    def perform_create(self, serializer):
+        user = self.request.user
+        emp = getattr(user, 'employee_profile', None)
+        if 'employee' not in serializer.validated_data and emp:
+            serializer.save(employee=emp)
+        else:
+            serializer.save()
+
+
     @action(detail=True, methods=['post'], url_path='approve')
     def approve(self, request, pk=None):
         """

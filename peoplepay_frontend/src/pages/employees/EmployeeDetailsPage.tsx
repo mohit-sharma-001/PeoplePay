@@ -17,6 +17,9 @@ import {
   EyeOff,
   AlertCircle,
   UserCheck,
+  CheckCircle2,
+  Loader2,
+  Edit3,
 } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
@@ -25,9 +28,12 @@ import { Avatar } from '../../components/ui/Avatar';
 import { Tabs } from '../../components/ui/Tabs';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
+import { Input } from '../../components/ui/Input';
+import { Select } from '../../components/ui/Select';
 import { employeesApi } from '../../services/api/employees';
 import { contractsApi } from '../../services/api/contracts';
 import { attendanceApi } from '../../services/api/attendance';
+import { ApiError } from '../../services/api/client';
 import { useAuth } from '../../hooks/useAuth';
 import { Employee } from '../../types/employee';
 import { Contract } from '../../types/contract';
@@ -42,6 +48,21 @@ function generateSecurePassword() {
   }
   return password;
 }
+
+const DEPARTMENT_OPTIONS = [
+  { value: 'Engineering', label: 'Engineering' },
+  { value: 'Product', label: 'Product' },
+  { value: 'HR', label: 'HR' },
+  { value: 'Finance', label: 'Finance' },
+  { value: 'Sales', label: 'Sales' },
+  { value: 'Operations', label: 'Operations' },
+];
+
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
+  { value: 'terminated', label: 'Terminated' },
+];
 
 export const EmployeeDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -64,24 +85,41 @@ export const EmployeeDetailsPage: React.FC = () => {
   const [createdCredentials, setCreatedCredentials] = useState<{ username: string; password: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    async function loadEmployee() {
-      setIsLoading(true);
-      if (!id) return;
-      const empRes = await employeesApi.getById(id);
-      setEmployee(empRes.data);
+  // Edit Profile Modal State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [globalError, setGlobalError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-      if (empRes.data) {
-        const [conRes, attRes] = await Promise.all([
-          contractsApi.getByEmployeeId(empRes.data.id),
-          attendanceApi.getByEmployeeId(empRes.data.id),
-        ]);
-        setContract(conRes.data);
-        setAttendance(attRes.data);
-      }
-      setIsLoading(false);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [department, setDepartment] = useState('Engineering');
+  const [jobPosition, setJobPosition] = useState('');
+  const [dateJoined, setDateJoined] = useState('');
+  const [statusVal, setStatusVal] = useState('active');
+
+  const loadEmployeeData = async () => {
+    setIsLoading(true);
+    if (!id) return;
+    const empRes = await employeesApi.getById(id);
+    setEmployee(empRes.data);
+
+    if (empRes.data) {
+      const [conRes, attRes] = await Promise.all([
+        contractsApi.getByEmployeeId(empRes.data.id),
+        attendanceApi.getByEmployeeId(empRes.data.id),
+      ]);
+      setContract(conRes.data);
+      setAttendance(attRes.data);
     }
-    loadEmployee();
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    loadEmployeeData();
   }, [id]);
 
   const isHRorAdmin =
@@ -151,6 +189,64 @@ export const EmployeeDetailsPage: React.FC = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const openEditModal = () => {
+    if (!employee) return;
+    setFirstName(employee.firstName || '');
+    setLastName(employee.lastName || '');
+    setEmail(employee.email || '');
+    setPhone(employee.phone || '');
+    setDepartment(employee.department || 'Engineering');
+    setJobPosition(employee.jobTitle || '');
+    setDateJoined(employee.joiningDate || new Date().toISOString().split('T')[0]);
+    setStatusVal((employee.status || 'Active').toLowerCase());
+    setFieldErrors({});
+    setGlobalError(null);
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateEmployee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!employee) return;
+    setSubmitting(true);
+    setFieldErrors({});
+    setGlobalError(null);
+
+    const payload = {
+      first_name: firstName.trim(),
+      last_name: lastName.trim(),
+      email: email.trim(),
+      phone: phone.trim(),
+      department,
+      job_position: jobPosition.trim(),
+      date_joined: dateJoined,
+      status: statusVal,
+    };
+
+    try {
+      await employeesApi.update(employee.id, payload);
+      setToastMessage('Employee profile updated successfully!');
+      setIsEditModalOpen(false);
+      await loadEmployeeData();
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (err: any) {
+      if (err instanceof ApiError && err.errors) {
+        const errorsObj: Record<string, string> = {};
+        if (typeof err.errors === 'object') {
+          Object.keys(err.errors).forEach((key) => {
+            const val = err.errors![key];
+            errorsObj[key] = Array.isArray(val) ? val.join(' ') : String(val);
+          });
+        }
+        setFieldErrors(errorsObj);
+        setGlobalError(err.message || 'Please fix the errors below.');
+      } else {
+        setGlobalError(err?.message || 'Failed to update employee record. Please try again.');
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   if (isLoading) {
     return <div className="p-8 text-center text-slate-500">Loading employee record...</div>;
   }
@@ -167,6 +263,14 @@ export const EmployeeDetailsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Toast Notification Banner */}
+      {toastMessage && (
+        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-semibold flex items-center gap-3 shadow-xs">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
       <PageHeader
         title={`${employee.firstName} ${employee.lastName}`}
         subtitle={`${employee.jobTitle} • ${employee.department}`}
@@ -228,7 +332,9 @@ export const EmployeeDetailsPage: React.FC = () => {
             <Button variant="outline" size="sm" onClick={() => navigate('/contracts')}>
               Manage Contract
             </Button>
-            <Button size="sm">Edit Profile</Button>
+            <Button size="sm" leftIcon={<Edit3 className="w-4 h-4" />} onClick={openEditModal}>
+              Edit Profile
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -501,6 +607,107 @@ export const EmployeeDetailsPage: React.FC = () => {
             </div>
           </form>
         )}
+      </Modal>
+
+      {/* Edit Profile Modal */}
+      <Modal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          if (!submitting) {
+            setIsEditModalOpen(false);
+          }
+        }}
+        title="Edit Employee Profile"
+        description={`Update details for ${employee.firstName} ${employee.lastName}`}
+        maxWidth="lg"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setIsEditModalOpen(false)} disabled={submitting}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateEmployee} disabled={submitting} leftIcon={submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : undefined}>
+              {submitting ? 'Saving...' : 'Update Profile'}
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleUpdateEmployee} className="space-y-4 text-left">
+          {globalError && (
+            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{globalError}</span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="First Name *"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              error={fieldErrors.first_name}
+              required
+            />
+            <Input
+              label="Last Name *"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              error={fieldErrors.last_name}
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Email Address *"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              error={fieldErrors.email}
+              required
+            />
+            <Input
+              label="Phone Number"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              error={fieldErrors.phone}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Select
+              label="Department *"
+              options={DEPARTMENT_OPTIONS}
+              value={department}
+              onChange={(e) => setDepartment(e.target.value)}
+              error={fieldErrors.department}
+            />
+            <Input
+              label="Job Position *"
+              value={jobPosition}
+              onChange={(e) => setJobPosition(e.target.value)}
+              error={fieldErrors.job_position}
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Joining Date *"
+              type="date"
+              value={dateJoined}
+              onChange={(e) => setDateJoined(e.target.value)}
+              error={fieldErrors.date_joined}
+              required
+            />
+            <Select
+              label="Status *"
+              options={STATUS_OPTIONS}
+              value={statusVal}
+              onChange={(e) => setStatusVal(e.target.value)}
+              error={fieldErrors.status}
+            />
+          </div>
+        </form>
       </Modal>
     </div>
   );

@@ -48,4 +48,21 @@ export const contractsApi = {
     const data = res.data && !Array.isArray(res.data) ? mapContract(res.data) : null;
     return { ...res, data };
   },
+
+  async create(payload: any): Promise<ApiResponse<Contract>> {
+    const res = await apiFetch<any>('/api/contracts/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return { ...res, data: mapContract(res.data) };
+  },
+
+  async update(id: string, payload: any): Promise<ApiResponse<Contract>> {
+    const res = await apiFetch<any>(`/api/contracts/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+    return { ...res, data: mapContract(res.data) };
+  },
 };
+
