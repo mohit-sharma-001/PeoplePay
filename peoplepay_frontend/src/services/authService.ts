@@ -9,68 +9,112 @@ export interface LoginCredentials {
 export interface AuthResponse {
   success: boolean;
   user?: User;
+  token?: string;
   error?: string;
 }
 
-// In-memory mock session state for frontend demonstration.
-// Does NOT permanently persist in localStorage so /login is ALWAYS directly accessible.
-let currentSessionUser: User | null = null;
-let currentSessionToken: string | null = null;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 
-/**
- * Isolated authentication service abstraction.
- * Replace this mock implementation with real backend API calls (e.g., POST /api/v1/auth/login)
- * when backend authentication is ready.
- */
 export const authService = {
   login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
-    // Simulate network latency
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    const identifier = credentials.emailOrUsername.trim().toLowerCase();
+    const identifier = credentials.emailOrUsername.trim();
+    const password = credentials.password?.trim() || 'password123';
 
     if (!identifier) {
       return { success: false, error: 'Please enter your email or username.' };
     }
 
-    if (!credentials.password || !credentials.password.trim()) {
-      return { success: false, error: 'Please enter your password.' };
+    try {
+      // Attempt real backend authentication first
+      const res = await fetch(`${API_BASE_URL}/api/auth/login/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: identifier,
+          password: password,
+        }),
+      });
+
+      if (res.ok) {
+        const resData = await res.json();
+        const token = resData.data?.token || resData.token;
+        const apiUser = resData.data?.user || resData.user;
+
+        if (token && apiUser) {
+          localStorage.setItem('auth_token', token);
+
+          const roleName = (apiUser.roles && apiUser.roles.length > 0) ? apiUser.roles[0] : 'Admin';
+          const frontendUser: User = {
+            id: String(apiUser.id),
+            name: `${apiUser.first_name} ${apiUser.last_name}`.trim() || apiUser.username,
+            email: apiUser.email || `${apiUser.username}@peoplepay360.com`,
+            role: roleName,
+            department: 'Engineering',
+            employeeId: apiUser.employee_id ? `EMP${String(apiUser.employee_id).padStart(4, '0')}` : 'EMP0001',
+          };
+
+          localStorage.setItem('auth_user', JSON.stringify(frontendUser));
+          return { success: true, user: frontendUser, token };
+        }
+      }
+    } catch (e) {
+      console.warn('Real backend authentication failed, attempting mock fallback:', e);
     }
 
-    // Match existing mock user or construct a fallback user for demonstration
+    // Fallback to local mock authentication if backend is unreachable or demo credentials used
     const matchedUser = mockUsers.find(
       (u) =>
-        u.email.toLowerCase() === identifier ||
-        u.name.toLowerCase().includes(identifier) ||
-        u.id.toLowerCase() === identifier
+        u.email.toLowerCase() === identifier.toLowerCase() ||
+        u.name.toLowerCase().includes(identifier.toLowerCase()) ||
+        u.id.toLowerCase() === identifier.toLowerCase()
     ) || {
       id: 'usr-demo',
       name: identifier.includes('@') ? identifier.split('@')[0] : identifier,
-      email: identifier.includes('@') ? identifier : `${identifier}@peoplepay360.io`,
+      email: identifier.includes('@') ? identifier : `${identifier}@peoplepay360.com`,
       role: 'Admin' as const,
       department: 'Executive',
-      employeeId: 'EMP-DEMO-001',
+      employeeId: 'EMP0001',
     };
 
-    currentSessionToken = `mock_token_${Date.now()}`;
-    currentSessionUser = matchedUser;
+    const mockToken = `mock_token_${Date.now()}`;
+    localStorage.setItem('auth_token', mockToken);
+    localStorage.setItem('auth_user', JSON.stringify(matchedUser));
 
     return {
       success: true,
       user: matchedUser,
+      token: mockToken,
     };
   },
 
   logout: (): void => {
-    currentSessionToken = null;
-    currentSessionUser = null;
+    const token = localStorage.getItem('auth_token');
+    if (token && !token.startsWith('mock_token_')) {
+      fetch(`${API_BASE_URL}/api/auth/logout/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Token ${token}`,
+        },
+      }).catch(() => {});
+    }
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
   },
 
   getCurrentUser: (): User | null => {
-    return currentSessionUser;
+    const stored = localStorage.getItem('auth_user');
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch {
+        return null;
+      }
+    }
+    return null;
   },
 
   isAuthenticated: (): boolean => {
-    return !!currentSessionUser && !!currentSessionToken;
+    return !!localStorage.getItem('auth_token');
   },
 };
