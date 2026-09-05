@@ -1,276 +1,143 @@
-# PeoplePay 360 Backend (Django REST Framework)
+# PeoplePay 360 — Complete Enterprise HRMS & Payroll Prototype
 
-Enterprise HRMS & Payroll System REST API backend built with Django 5, Django REST Framework, and PostgreSQL.
+**PeoplePay 360** is a full-stack, enterprise-grade Human Resource Management System (HRMS) and Payroll Processing platform built with **Django REST Framework** (Backend) and **React TypeScript + Vite + Tailwind CSS** (Frontend).
 
-## System Architecture & App Structure
+---
 
-- `peoplepay360_backend/`: Core project configuration (settings, root routing, WSGI/ASGI)
-- `core/`: Shared utilities (`TimeStampedModel` abstract base class, unified `api_response` format helper)
-- `employees/`: Employee lifecycle, profile details, emergency contacts, search/filter APIs
-- `contracts/`: Period-based contracts, salary/wage details, contract renewal/termination
-- `working_schedule/`: Weekly shifts, daily work hours, expected hours per employee
-- `attendance/`: Daily check-in/out, worked hours calculation, correction request workflow
-- `time_off/`: Leave policies (types), leave balance allocations, request submission & manager approvals
-- `payroll/`: Salary structures, salary rules, payrun wizard processing, payslips
-- `dashboard/`: Analytics metrics and reporting breakdown endpoints
+## Architecture & Technology Stack
+
+### Backend (`peoplepay360_backend`)
+- **Core Framework**: Django 5.x & Django REST Framework (DRF)
+- **Database**: SQLite (Development) / PostgreSQL (Production)
+- **PDF Engine**: ReportLab (Pure Python PDF rendering, zero system-level dependencies)
+- **Authentication**: Token-Based Authentication (`rest_framework.authtoken`) & Custom Role Permissions
+
+### Frontend (`peoplepay_frontend`)
+- **Core Framework**: React 18 + TypeScript + Vite
+- **Styling**: Vanilla CSS tokens & Tailwind CSS (Dark/Light multi-theme adaptive design system)
+- **Icons**: Lucide React
+- **State & Routing**: React Router v6, custom Hooks (`useAuth`, `usePermissions`, `useTheme`)
+
+---
+
+## Core Feature Modules & Capabilities
+
+### 1. Executive Dashboard (`/dashboard`)
+- Real-time workforce metrics: Total Headcount, Active Rate %, Pending Leave Applications, and Current Payrun Net Total.
+- Quick navigation shortcuts to core operational modules.
+
+### 2. Employee Directory & Lifecycle (`/employees`)
+- Dual display modes: Interactive **List View** and **Kanban Board** grouped by department.
+- **Admin-Only Hard Delete**: Cascades profile data, active contracts, attendance, leave requests, payslips, and linked Django User accounts.
+- **Admin-Only Termination Workflow**:
+  - Automatically cancels active contracts (`state='cancelled'`, `date_end=today`).
+  - Disables user portal access (`user.is_active=False`).
+  - Auto-cancels pending leave requests (`status='submitted'`).
+  - Excludes employee from future payroll wage calculations ($0 wage, `is_excluded=True`).
+- **Reactivation Workflow**: Restores employee status, re-enables login account, and reactivates cancelled contracts (`state='running'`).
+
+### 3. Contracts Management (`/contracts`)
+- Period-based contract creation with wage rates, job titles, and department tracking.
+- State machine support: `Draft`, `Running`, `Expired`, `Cancelled`.
+
+### 4. Working Schedule Engine (`/schedules`)
+- Full interactive CRUD on working schedules.
+- Configurable shift rules: Fixed vs Flexible schedule types, weekly target hours, and custom day-shift breakdowns (start/end times, break durations).
+
+### 5. Attendance Management (`/attendance`)
+- Real-time check-in and check-out tracking per employee.
+- Automatic worked hours computation and attendance correction request workflow.
+
+### 6. Time Off & Leave Engine (`/time-off`)
+- Working-day calculator incorporating weekends (Saturday/Sunday) and national holidays.
+- Leave Types (Paid/Unpaid, Fixed/No-Limit allocations).
+- Leave Request submission with automatic **Unpaid Leave spillover split** when balance is exceeded.
+
+### 7. Payroll Processing & Engine (`/payroll`)
+- **Structure & Rules Wizard**: Salary Structures containing sequence-ordered Salary Rules (Base, Percentage, Allowances, Deductions).
+- **Attendance-Based Wage Proration**: Automatically scales base wage according to actual worked hours vs expected scheduled hours (`calculate_worked_percentage`).
+- **Payslip Adjustments**: Add overtime or festival incentive additions/deductions prior to payrun validation.
+- **ReportLab PDF Payslip Export**: Generate branded, downloadable PDF payslips with exact breakdown details.
+
+### 8. Reports & Analytics (`/reports`)
+- **Monthly Payroll Cost Report**: Departmental headcount and financial breakdown with CSV export.
+- **Leave Liability Valuation Report**: Real-time monetary valuation of unutilized employee leave balances with trend analytics and CSV export.
+- **Full Ledger Export**: Single-click downloadable full payroll ledger in CSV format.
+
+---
+
+## Role-Based Access Control (RBAC)
+
+The system enforces a strict linear role hierarchy:
+
+| Role | HR Access (Employees, Contracts, Schedules, Attendance, Time Off) | Payroll Access (Structures, Rules, Payruns, Payslips, Reports) |
+| :--- | :--- | :--- |
+| **Employee** | Self-service profile, attendance check-in, and leave submission | View own PDF payslips |
+| **HR Manager** | **Full CRUD** (Create, edit, approve leave/attendance corrections) | **No Access** (0 visibility) |
+| **HR Payroll User** | **Full CRUD** (Create/edit employees, contracts, schedules, attendance, approve leave) | **Operational Access** (View structures, compute draft payruns, add adjustments, view reports) |
+| **HR Payroll Manager** | **Full CRUD** (Inherits HR Manager capabilities) | **Full Management** (Create/edit structures & rules, validate/mark-paid payruns) |
+| **Admin** | **Full Access** + Exclusive **Hard Delete** & **Employee Termination/Reactivation** | **Full Management** + User Account & Role Management |
 
 ---
 
 ## Local Setup & Quick Start
 
-### 1. Prerequisites
-- Python 3.10+
-- PostgreSQL database server
+### 1. Backend Setup (Django)
 
-### 2. Virtual Environment Setup
 ```bash
-# Create virtual environment
-python3 -m venv venv
+# Navigate to workspace root
+cd /path/to/PeoplePay
 
 # Activate virtual environment
 source venv/bin/activate
-```
 
-### 3. Install Dependencies
-```bash
+# Install Python dependencies
 pip install -r requirements.txt
-```
 
-### 4. Environment Configuration
-Copy `.env.example` to `.env` and fill in your PostgreSQL credentials:
-```bash
-cp .env.example .env
-```
-
-Ensure your PostgreSQL server is running and a database named `peoplepay360_db` is created:
-```sql
-CREATE DATABASE peoplepay360_db;
-```
-
-### 5. Database Migrations
-Run initial Django migrations:
-```bash
-python manage.py makemigrations
+# Run migrations & seed data (optional)
 python manage.py migrate
-```
 
-### 6. Run Development Server
-```bash
+# Start Django Development Server
 python manage.py runserver
 ```
+The Django REST Framework backend runs at `http://127.0.0.1:8000/`.
 
-The API server will run at `http://127.0.0.1:8000/`.
+### 2. Frontend Setup (React TypeScript)
+
+```bash
+# Navigate to frontend directory
+cd /path/to/PeoplePay/peoplepay_frontend
+
+# Install Node dependencies
+npm install
+
+# Start Vite Development Server
+npm run dev
+```
+The React frontend application runs at `http://localhost:5173/`.
 
 ---
 
----
+## Verification & Testing
 
-## Authentication & User Role Management API Endpoints
-
-### 1. Public Self-Registration
-* **URL:** `POST /api/auth/register/`
-* **Access:** Public (`permission_classes = [AllowAny]`)
-* **Description:** Registers a new User account and auto-creates a linked `Employee` profile. Assigns the user strictly to the `"Employee"` role group (ignoring any privilege escalation attempts). Automatically generates a DRF Auth Token.
-
-#### Request Body
-```json
-{
-  "username": "johndoe",
-  "password": "Password123!",
-  "email": "john.doe@example.com",
-  "first_name": "John",
-  "last_name": "Doe",
-  "phone": "+15550192834",
-  "department": "Engineering",
-  "job_position": "Software Engineer"
-}
+### Run Backend Unit Tests
+```bash
+python manage.py test
 ```
+*Executes 87 automated unit tests covering models, serializers, permissions, engine calculations, and API endpoints.*
 
-#### Success Response (`HTTP 201 Created`)
-```json
-{
-  "success": true,
-  "message": "User registered successfully.",
-  "data": {
-    "token": "a1b2c3d4e5f67890123456789abcdef012345678",
-    "user": {
-      "id": 12,
-      "username": "johndoe",
-      "email": "john.doe@example.com",
-      "first_name": "John",
-      "last_name": "Doe",
-      "is_superuser": false,
-      "roles": [
-        "Employee"
-      ],
-      "employee_id": 8
-    }
-  },
-  "errors": null
-}
+### Run Frontend Production Build
+```bash
+cd peoplepay_frontend
+npm run build
 ```
-
-#### Validation Error Response (`HTTP 400 Bad Request`)
-```json
-{
-  "success": false,
-  "message": "Registration failed.",
-  "data": null,
-  "errors": {
-    "username": "Username is already taken.",
-    "email": "Email is already registered."
-  }
-}
-```
+*Performs TypeScript type checking (`tsc -b`) and Vite production bundle compilation.*
 
 ---
 
-### 2. User Authentication (Login & Logout)
-* **Login URL:** `POST /api/auth/login/` (Public)
-* **Logout URL:** `POST /api/auth/logout/` (Authenticated)
+## Standard API Response Envelope
 
-#### Login Request Body
-```json
-{
-  "username": "admin",
-  "password": "password123"
-}
-```
-
-#### Login Success Response (`HTTP 200 OK`)
-```json
-{
-  "success": true,
-  "message": "Login successful.",
-  "data": {
-    "token": "9944b09199c62bcf9418ad846d0a400ed254425b",
-    "user": {
-      "id": 1,
-      "username": "admin",
-      "email": "admin@peoplepay360.com",
-      "first_name": "System",
-      "last_name": "Admin",
-      "is_superuser": true,
-      "roles": [
-        "Admin"
-      ],
-      "employee_id": 1
-    }
-  },
-  "errors": null
-}
-```
-
----
-
-### 3. Admin List Users
-* **URL:** `GET /api/auth/users/` (or with query filter `GET /api/auth/users/?role=Employee`)
-* **Access:** Restricted to `"Admin"` role users.
-* **Description:** Retrieves all user accounts in the system with their assigned roles and linked employee details.
-
-#### Success Response (`HTTP 200 OK`)
-```json
-{
-  "success": true,
-  "message": "Users retrieved successfully.",
-  "data": [
-    {
-      "id": 1,
-      "username": "admin",
-      "email": "admin@peoplepay360.com",
-      "first_name": "System",
-      "last_name": "Admin",
-      "is_superuser": true,
-      "roles": [
-        "Admin"
-      ],
-      "employee_id": 1,
-      "employee_name": "System Admin"
-    },
-    {
-      "id": 12,
-      "username": "johndoe",
-      "email": "john.doe@example.com",
-      "first_name": "John",
-      "last_name": "Doe",
-      "is_superuser": false,
-      "roles": [
-        "Employee"
-      ],
-      "employee_id": 8,
-      "employee_name": "John Doe"
-    }
-  ],
-  "errors": null
-}
-```
-
----
-
-### 4. Admin Role Assignment
-* **URL:** `PATCH /api/auth/users/{user_id}/assign-role/`
-* **Access:** Restricted to `"Admin"` role users.
-* **Description:** Replaces a user's group roles entirely with the provided list of roles.
-
-#### Request Body
-```json
-{
-  "roles": [
-    "HR Manager"
-  ]
-}
-```
-
-#### Success Response (`HTTP 200 OK`)
-```json
-{
-  "success": true,
-  "message": "User roles updated successfully.",
-  "data": {
-    "id": 12,
-    "username": "johndoe",
-    "email": "john.doe@example.com",
-    "first_name": "John",
-    "last_name": "Doe",
-    "roles": [
-      "HR Manager"
-    ],
-    "employee_id": 8
-  },
-  "errors": null
-}
-```
-
-#### Invalid Role Error Response (`HTTP 400 Bad Request`)
-```json
-{
-  "success": false,
-  "message": "Invalid role assignment.",
-  "data": null,
-  "errors": {
-    "roles": "Invalid role(s): SuperUserRole. Valid roles are: Admin, HR Manager, HR Payroll Manager, HR Payroll User, Employee."
-  }
-}
-```
-
----
-
-## Base API Endpoints
-
-- Health Check: `GET /api/`
-- Employees: `GET /api/employees/`
-- Contracts: `GET /api/contracts/`
-- Working Schedule: `GET /api/working-schedule/`
-- Attendance: `GET /api/attendance/`
-- Time Off: `GET /api/time-off/`
-- Payroll: `GET /api/payroll/`
-- Dashboard: `GET /api/dashboard/`
-
----
-
-## Standard API Response Format
-
-All API endpoints return JSON formatted with the standard envelope structure:
+All REST API endpoints return JSON formatted with a unified response structure:
 
 ```json
 {
