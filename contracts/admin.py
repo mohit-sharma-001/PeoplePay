@@ -17,3 +17,12 @@ class ContractAdmin(admin.ModelAdmin):
     list_filter = ('state', 'department', 'date_start')
     search_fields = ('employee__first_name', 'employee__last_name', 'employee__employee_code', 'job_position')
     ordering = ('-date_start',)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
