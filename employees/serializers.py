@@ -8,6 +8,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
     """
     full_name = serializers.SerializerMethodField(read_only=True)
     manager_name = serializers.SerializerMethodField(read_only=True)
+    working_schedule_name = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Employee
@@ -23,6 +24,8 @@ class EmployeeSerializer(serializers.ModelSerializer):
             'job_position',
             'manager',
             'manager_name',
+            'working_schedule',
+            'working_schedule_name',
             'user',
             'date_joined',
             'status',
@@ -37,4 +40,9 @@ class EmployeeSerializer(serializers.ModelSerializer):
     def get_manager_name(self, obj):
         if obj.manager:
             return f"{obj.manager.first_name} {obj.manager.last_name}"
+        return None
+
+    def get_working_schedule_name(self, obj):
+        if obj.working_schedule:
+            return obj.working_schedule.name
         return None

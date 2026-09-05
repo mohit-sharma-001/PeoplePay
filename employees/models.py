@@ -58,6 +58,14 @@ class Employee(TimeStampedModel):
         choices=Status.choices,
         default=Status.ACTIVE
     )
+    working_schedule = models.ForeignKey(
+        'working_schedule.WorkingSchedule',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='employees',
+        help_text="Assigned shift schedule for expected working hours"
+    )
 
     class Meta:
         ordering = ['employee_code']

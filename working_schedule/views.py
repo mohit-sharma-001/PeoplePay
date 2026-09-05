@@ -1,7 +1,17 @@
-from rest_framework.decorators import api_view
-from core.utils import api_response
+from rest_framework import viewsets, permissions, filters
+from working_schedule.models import WorkingSchedule
+from working_schedule.serializers import WorkingScheduleSerializer
 
 
-@api_view(['GET'])
-def working_schedule_index(request):
-    return api_response(data=[], message="Working Schedule module API skeleton")
+class WorkingScheduleViewSet(viewsets.ModelViewSet):
+    """
+    ModelViewSet for full CRUD management of Working Schedules.
+    Supports nested lines creation/update.
+    """
+    queryset = WorkingSchedule.objects.all().prefetch_related('lines').order_by('name')
+    serializer_class = WorkingScheduleSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name', 'company_name']
+    ordering_fields = ['name', 'created_at']
+    ordering = ['name']
