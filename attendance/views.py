@@ -1,6 +1,7 @@
 from rest_framework import viewsets, permissions, filters, status
 from rest_framework.decorators import action
 from django.utils import timezone
+from core.permissions import HasRole, is_employee_only
 from core.utils import api_response
 from attendance.models import Attendance
 from attendance.serializers import AttendanceSerializer
@@ -9,12 +10,24 @@ from attendance.serializers import AttendanceSerializer
 class AttendanceViewSet(viewsets.ModelViewSet):
     """
     ModelViewSet for full CRUD management of Attendance Records.
-    Supports filtering by ?employee=, ?status=, and date range ?date_from= & ?date_to=.
-    Provides custom live time-clock actions: POST /api/attendance/check-in/ and POST /api/attendance/check-out/.
+    Restricts manual create/update/destroy & approve_correction to Admin and HR Manager.
+    Filters queryset for Employee role to see only their own attendance records.
+    Check-in and Check-out custom actions are open to any authenticated employee.
     """
     queryset = Attendance.objects.all().select_related('employee').order_by('-check_in')
     serializer_class = AttendanceSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasRole]
+    action_allowed_roles = {
+        'list': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User', 'Employee'],
+        'retrieve': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User', 'Employee'],
+        'check_in': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User', 'Employee'],
+        'check_out': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User', 'Employee'],
+        'create': ['Admin', 'HR Manager'],
+        'update': ['Admin', 'HR Manager'],
+        'partial_update': ['Admin', 'HR Manager'],
+        'destroy': ['Admin', 'HR Manager'],
+        'approve_correction': ['Admin', 'HR Manager'],
+    }
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['employee__first_name', 'employee__last_name', 'employee__employee_code', 'notes']
     ordering_fields = ['check_in', 'check_out', 'status', 'created_at']
@@ -22,6 +35,14 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
+        user = self.request.user
+
+        if is_employee_only(user):
+            if hasattr(user, 'employee_profile') and user.employee_profile:
+                queryset = queryset.filter(employee=user.employee_profile)
+            else:
+                queryset = queryset.none()
+
         employee_id = self.request.query_params.get('employee')
         status_param = self.request.query_params.get('status')
         date_from = self.request.query_params.get('date_from')
@@ -53,7 +74,6 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
         employee = user.employee_profile
 
-        # Check for open check-in record without check_out
         open_record = Attendance.objects.filter(employee=employee, check_out__isnull=True).first()
         if open_record:
             return api_response(
@@ -112,8 +132,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     def approve_correction(self, request, pk=None):
         """
         Manager / Admin endpoint to approve attendance corrections or overtime hours.
-        Expects optional 'check_out', 'status', and 'notes' in request body.
-        Marks is_manual_correction = True, enabling full uncapped worked_hours.
+        Restricted to Admin and HR Manager roles.
         """
         attendance = self.get_object()
         check_out_val = request.data.get('check_out')

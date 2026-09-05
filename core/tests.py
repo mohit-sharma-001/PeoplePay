@@ -1,5 +1,5 @@
 from django.test import TestCase
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from rest_framework.test import APIClient
 from rest_framework import status
 
@@ -7,10 +7,12 @@ from rest_framework import status
 class CoreAPITestCase(TestCase):
     def setUp(self):
         self.client = APIClient()
+        self.admin_group, _ = Group.objects.get_or_create(name='Admin')
         self.user = User.objects.create_user(
             username='coretestuser',
             password='Password123!'
         )
+        self.user.groups.add(self.admin_group)
 
     def test_api_root_health(self):
         response = self.client.get('/api/')
@@ -26,8 +28,8 @@ class CoreAPITestCase(TestCase):
             '/api/contracts/',
             '/api/working-schedule/',
             '/api/attendance/',
-            '/api/time-off/',
-            '/api/payroll/',
+            '/api/time-off/types/',
+            '/api/payroll/structures/',
             '/api/dashboard/',
         ]
         for endpoint in endpoints:

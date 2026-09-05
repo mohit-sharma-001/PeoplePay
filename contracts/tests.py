@@ -1,5 +1,5 @@
 from django.test import TestCase
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from rest_framework.test import APIClient
 from rest_framework import status
 from datetime import date
@@ -10,7 +10,12 @@ from contracts.models import Contract
 class ContractAPITestCase(TestCase):
     def setUp(self):
         self.client = APIClient()
+        self.admin_group, _ = Group.objects.get_or_create(name='Admin')
+        self.hr_group, _ = Group.objects.get_or_create(name='HR Manager')
+        self.emp_group, _ = Group.objects.get_or_create(name='Employee')
+
         self.user = User.objects.create_user(username='contractuser', password='Password123!')
+        self.user.groups.add(self.admin_group)
         self.client.force_authenticate(user=self.user)
 
         self.employee = Employee.objects.create(
@@ -22,7 +27,6 @@ class ContractAPITestCase(TestCase):
             date_joined=date(2024, 1, 1)
         )
 
-        # Create active running contract
         self.running_contract = Contract.objects.create(
             employee=self.employee,
             wage=90000.00,
@@ -38,10 +42,6 @@ class ContractAPITestCase(TestCase):
         self.assertFalse(self.running_contract.is_active_for_period(date(2023, 1, 1), date(2023, 12, 31)))
 
     def test_overlapping_running_contract_post_returns_400(self):
-        """
-        POSTing a second 'running' contract for an employee who already has an active
-        running contract in an overlapping period MUST return an HTTP 400 Bad Request.
-        """
         payload = {
             "employee": self.employee.id,
             "wage": "95000.00",
@@ -67,3 +67,19 @@ class ContractAPITestCase(TestCase):
         }
         response = self.client.post('/api/contracts/', payload, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_employee_role_cannot_create_contract_returns_403(self):
+        emp_user = User.objects.create_user(username='plain_emp', password='Password123!')
+        emp_user.groups.add(self.emp_group)
+        self.client.force_authenticate(user=emp_user)
+
+        payload = {
+            "employee": self.employee.id,
+            "wage": "60000.00",
+            "date_start": "2026-01-01",
+            "state": "draft",
+            "department": "Engineering",
+            "job_position": "Junior Engineer"
+        }
+        response = self.client.post('/api/contracts/', payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

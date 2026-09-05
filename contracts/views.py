@@ -1,4 +1,5 @@
 from rest_framework import viewsets, permissions, filters
+from core.permissions import HasRole
 from contracts.models import Contract
 from contracts.serializers import ContractSerializer
 
@@ -6,11 +7,13 @@ from contracts.serializers import ContractSerializer
 class ContractViewSet(viewsets.ModelViewSet):
     """
     ModelViewSet for full CRUD management of Employment Contracts.
+    Restricted to Admin and HR Manager roles.
     Supports filtering by ?employee=, ?state=, ?department= and ordering by date_start.
     """
     queryset = Contract.objects.all().select_related('employee').order_by('-date_start')
     serializer_class = ContractSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasRole]
+    allowed_roles = ['Admin', 'HR Manager']
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['employee__first_name', 'employee__last_name', 'employee__employee_code', 'job_position']
     ordering_fields = ['date_start', 'wage', 'state', 'created_at']

@@ -10,8 +10,9 @@ class EmployeeAPITestCase(TestCase):
     def setUp(self):
         self.client = APIClient()
 
-        # Create test group & user
         self.admin_group, _ = Group.objects.get_or_create(name='Admin')
+        self.emp_group, _ = Group.objects.get_or_create(name='Employee')
+
         self.user = User.objects.create_user(
             username='testuser',
             password='Password123!',
@@ -19,7 +20,6 @@ class EmployeeAPITestCase(TestCase):
         )
         self.user.groups.add(self.admin_group)
 
-        # Create test employee
         self.employee = Employee.objects.create(
             user=self.user,
             first_name='Rajesh',
@@ -54,7 +54,6 @@ class EmployeeAPITestCase(TestCase):
         self.assertEqual(response.data['data']['user']['username'], 'testuser')
 
     def test_employee_list_authenticated(self):
-        # Obtain token
         login_res = self.client.post('/api/auth/login/', {
             'username': 'testuser',
             'password': 'Password123!'
@@ -74,12 +73,45 @@ class EmployeeAPITestCase(TestCase):
         token = login_res.data['data']['token']
         self.client.credentials(HTTP_AUTHORIZATION='Token ' + token)
 
-        # Test search
         search_res = self.client.get('/api/employees/?search=Rajesh')
         self.assertEqual(search_res.status_code, status.HTTP_200_OK)
         self.assertEqual(len(search_res.data), 1)
 
-        # Test department filter
         filter_res = self.client.get('/api/employees/?department=Engineering')
         self.assertEqual(filter_res.status_code, status.HTTP_200_OK)
         self.assertEqual(len(filter_res.data), 1)
+
+    def test_employee_role_sees_only_own_record(self):
+        emp_user = User.objects.create_user(username='plain_emp_user', password='Password123!')
+        emp_user.groups.add(self.emp_group)
+        plain_emp = Employee.objects.create(
+            user=emp_user,
+            first_name='Sneha',
+            last_name='Patel',
+            email='sneha@example.com',
+            department=Employee.Department.HR,
+            job_position='HR Specialist',
+            date_joined=date(2023, 5, 1)
+        )
+
+        self.client.force_authenticate(user=emp_user)
+        response = self.client.get('/api/employees/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['id'], plain_emp.id)
+
+    def test_employee_role_cannot_create_employee_returns_403(self):
+        emp_user = User.objects.create_user(username='plain_emp_user2', password='Password123!')
+        emp_user.groups.add(self.emp_group)
+
+        self.client.force_authenticate(user=emp_user)
+        payload = {
+            "first_name": "New",
+            "last_name": "Emp",
+            "email": "new@example.com",
+            "department": "Engineering",
+            "job_position": "Dev",
+            "date_joined": "2026-01-01"
+        }
+        response = self.client.post('/api/employees/', payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
