@@ -88,6 +88,37 @@ def logout_view(request):
     )
 
 
+def auto_allocate_leave_types(employee):
+    """
+    Automatically creates a TimeOffAllocation record for each active TimeOffType
+    that requires_allocation=True for a newly registered employee.
+    """
+    from time_off.models import TimeOffType, TimeOffAllocation
+    today = date.today()
+    end_of_year = date(today.year, 12, 31)
+
+    requires_alloc_types = TimeOffType.objects.filter(requires_allocation=True)
+    for time_off_type in requires_alloc_types:
+        name_lower = time_off_type.name.lower()
+        if 'sick' in name_lower:
+            allocated = 10.0
+        elif 'paid' in name_lower or 'annual' in name_lower or 'pto' in name_lower:
+            allocated = 20.0
+        else:
+            allocated = 20.0
+
+        TimeOffAllocation.objects.get_or_create(
+            employee=employee,
+            time_off_type=time_off_type,
+            defaults={
+                'allocated_amount': allocated,
+                'valid_from': today,
+                'valid_until': end_of_year,
+                'state': TimeOffAllocation.State.CONFIRMED,
+            }
+        )
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_view(request):
@@ -175,6 +206,9 @@ def register_view(request):
         status=Employee.Status.ACTIVE
     )
 
+    # Auto-allocate default time off allocations for newly registered employee
+    auto_allocate_leave_types(employee)
+
     # Generate Auth Token
     token, _ = Token.objects.get_or_create(user=user)
 
@@ -204,7 +238,7 @@ def register_view(request):
 def list_users_view(request):
     """
     Admin-only endpoint to list system user accounts.
-    Supports filtering by role via query parameter `?role=Employee`.
+    Supports filtering by role via `?role=Employee` and employee via `?employee_id=<id>`.
     """
     if not (request.user.is_superuser or request.user.groups.filter(name='Admin').exists()):
         return api_response(
@@ -218,6 +252,10 @@ def list_users_view(request):
     role_filter = request.query_params.get('role')
     if role_filter:
         users = users.filter(groups__name__iexact=role_filter)
+
+    employee_id_filter = request.query_params.get('employee_id') or request.query_params.get('employee')
+    if employee_id_filter:
+        users = users.filter(employee_profile__id=employee_id_filter)
 
     data = []
     for u in users:
@@ -238,6 +276,7 @@ def list_users_view(request):
         data=data,
         message="Users retrieved successfully."
     )
+
 
 
 list_users_view.allowed_roles = ['Admin']

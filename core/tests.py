@@ -141,3 +141,54 @@ class AuthEndpointsTestCase(TestCase):
         self.assertEqual(roles, ['HR Manager'])
         self.assertNotIn('Employee', roles)
 
+    def test_register_auto_creates_timeoff_allocations(self):
+        from time_off.models import TimeOffType, TimeOffAllocation
+
+        pto_type, _ = TimeOffType.objects.get_or_create(
+            name="Paid Time Off",
+            defaults={"requires_allocation": True, "is_paid": True, "requires_approval": True}
+        )
+        sick_type, _ = TimeOffType.objects.get_or_create(
+            name="Sick Leave",
+            defaults={"requires_allocation": True, "is_paid": True, "requires_approval": True}
+        )
+
+        payload = {
+            "username": "autoallocuser",
+            "password": "Password123!",
+            "email": "autoalloc@example.com",
+            "first_name": "Auto",
+            "last_name": "Alloc",
+            "department": "Engineering",
+            "job_position": "Developer"
+        }
+        res = self.client.post('/api/auth/register/', payload, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+        emp_id = res.data['data']['user']['employee_id']
+        allocations = TimeOffAllocation.objects.filter(employee_id=emp_id)
+        self.assertGreaterEqual(allocations.count(), 2)
+
+        type_names = set(allocations.values_list('time_off_type__name', flat=True))
+        self.assertIn("Paid Time Off", type_names)
+        self.assertIn("Sick Leave", type_names)
+
+    def test_list_users_filter_by_employee_id(self):
+        self.client.force_authenticate(user=self.admin_user)
+        emp = Employee.objects.create(
+            user=self.employee_user,
+            first_name="Emp",
+            last_name="Test",
+            email="emp_test@example.com",
+            department="Engineering",
+            job_position="Developer",
+            date_joined="2026-01-01"
+        )
+        filter_res = self.client.get(f'/api/auth/users/?employee_id={emp.id}')
+        self.assertEqual(filter_res.status_code, status.HTTP_200_OK)
+        data = filter_res.data['data']
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]['id'], self.employee_user.id)
+
+
+

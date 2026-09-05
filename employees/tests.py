@@ -12,6 +12,8 @@ class EmployeeAPITestCase(TestCase):
 
         self.admin_group, _ = Group.objects.get_or_create(name='Admin')
         self.emp_group, _ = Group.objects.get_or_create(name='Employee')
+        self.hr_group, _ = Group.objects.get_or_create(name='HR Manager')
+
 
         self.user = User.objects.create_user(
             username='testuser',
@@ -172,4 +174,62 @@ class EmployeeAPITestCase(TestCase):
         self.assertEqual(emp_no_user.user.username, 'newlogin3')
         self.assertTrue(emp_no_user.user.check_password('Password123!'))
         self.assertTrue(emp_no_user.user.groups.filter(name='Employee').exists())
+
+    def test_admin_create_login_custom_role_succeeds(self):
+        emp_no_user = Employee.objects.create(
+            first_name='AdminRole',
+            last_name='User',
+            email='adminrole@example.com',
+            department=Employee.Department.ENGINEERING,
+            job_position='Payroll Lead',
+            date_joined=date(2026, 1, 1)
+        )
+        self.client.force_authenticate(user=self.user)  # Admin user
+        response = self.client.post(
+            f'/api/employees/{emp_no_user.id}/create-login/',
+            {'username': 'payroll_lead', 'password': 'Password123!', 'roles': ['HR Payroll Manager']},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['roles'], ['HR Payroll Manager'])
+
+    def test_hr_manager_create_login_custom_role_forced_to_employee(self):
+        hr_user = User.objects.create_user(username='hr_user_role', password='Password123!')
+        hr_user.groups.add(self.hr_group)
+
+        emp_no_user = Employee.objects.create(
+            first_name='HRRole',
+            last_name='Target',
+            email='hrtarget@example.com',
+            department=Employee.Department.HR,
+            job_position='Recruiter',
+            date_joined=date(2026, 1, 1)
+        )
+        self.client.force_authenticate(user=hr_user)
+        response = self.client.post(
+            f'/api/employees/{emp_no_user.id}/create-login/',
+            {'username': 'recruiter_user', 'password': 'Password123!', 'roles': ['Admin']},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['roles'], ['Employee'])
+
+    def test_create_login_invalid_role_returns_400(self):
+        emp_no_user = Employee.objects.create(
+            first_name='InvalidRole',
+            last_name='Target',
+            email='invalidrole@example.com',
+            department=Employee.Department.ENGINEERING,
+            job_position='Dev',
+            date_joined=date(2026, 1, 1)
+        )
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            f'/api/employees/{emp_no_user.id}/create-login/',
+            {'username': 'invalid_role_user', 'password': 'Password123!', 'roles': ['SuperAdminRole']},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('roles', response.data)
+
 

@@ -45,8 +45,8 @@ class ContractAPITestCase(TestCase):
         payload = {
             "employee": self.employee.id,
             "wage": "95000.00",
-            "date_start": "2024-05-01",
-            "date_end": "2025-05-01",
+            "date_start": "2026-01-01",
+            "date_end": "2027-12-31",
             "state": "running",
             "department": "Engineering",
             "job_position": "Senior Engineer"
@@ -54,6 +54,7 @@ class ContractAPITestCase(TestCase):
         response = self.client.post('/api/contracts/', payload, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('date_start', response.data)
+
 
     def test_non_overlapping_draft_contract_post_succeeds(self):
         payload = {
@@ -83,3 +84,69 @@ class ContractAPITestCase(TestCase):
         }
         response = self.client.post('/api/contracts/', payload, format='json')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_effective_state_expired_vs_running(self):
+        test_emp = Employee.objects.create(
+            first_name='Eff',
+            last_name='State',
+            email='effstate@example.com',
+            department=Employee.Department.ENGINEERING,
+            job_position='Engineer',
+            date_joined=date(2020, 1, 1)
+        )
+        past_contract = Contract.objects.create(
+            employee=test_emp,
+            wage=70000.00,
+            date_start=date(2022, 1, 1),
+            date_end=date(2022, 12, 31),
+            state=Contract.State.RUNNING,
+            department='Engineering',
+            job_position='Engineer'
+        )
+        self.assertEqual(past_contract.effective_state, Contract.State.EXPIRED)
+        self.assertEqual(past_contract.state, Contract.State.RUNNING)
+
+        open_contract = Contract.objects.create(
+            employee=test_emp,
+            wage=85000.00,
+            date_start=date(2025, 1, 1),
+            date_end=None,
+            state=Contract.State.RUNNING,
+            department='Engineering',
+            job_position='Engineer'
+        )
+        self.assertEqual(open_contract.effective_state, Contract.State.RUNNING)
+
+
+    def test_expired_past_contract_does_not_block_new_running_contract(self):
+        emp2 = Employee.objects.create(
+            first_name='Anil',
+            last_name='Kumar',
+            email='anil@example.com',
+            department=Employee.Department.ENGINEERING,
+            job_position='Developer',
+            date_joined=date(2022, 1, 1)
+        )
+        Contract.objects.create(
+            employee=emp2,
+            wage=60000.00,
+            date_start=date(2022, 1, 1),
+            date_end=date(2022, 12, 31),
+            state=Contract.State.RUNNING,
+            department='Engineering',
+            job_position='Developer'
+        )
+
+        payload = {
+            "employee": emp2.id,
+            "wage": "80000.00",
+            "date_start": "2024-01-01",
+            "date_end": None,
+            "state": "running",
+            "department": "Engineering",
+            "job_position": "Senior Developer"
+        }
+        response = self.client.post('/api/contracts/', payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['effective_state'], 'running')
+

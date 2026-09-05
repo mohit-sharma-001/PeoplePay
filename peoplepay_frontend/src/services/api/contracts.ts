@@ -3,8 +3,9 @@ import { mockContracts } from '../../data/mockContracts';
 import { Contract } from '../../types/contract';
 
 function mapContract(apiItem: any): Contract {
-  const rawState = apiItem.state || apiItem.status || 'running';
+  const rawState = apiItem.effective_state || apiItem.state || apiItem.status || 'running';
   const statusStr = rawState.charAt(0).toUpperCase() + rawState.slice(1);
+
 
   return {
     id: String(apiItem.id),

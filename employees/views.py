@@ -55,7 +55,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     def create_login(self, request, pk=None):
         """
         Create a login User account for an Employee and link it via employee.user.
-        Restricted to Admin and HR Manager.
+        Restricted to Admin and HR Manager. Handles optional roles assignment for Admin.
         """
         employee = self.get_object()
 
@@ -80,6 +80,31 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # Role handling & validation
+        valid_roles = ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User', 'Employee']
+        requested_roles = request.data.get('roles')
+
+        user_is_admin = request.user.is_superuser or request.user.groups.filter(name='Admin').exists()
+
+        if requested_roles is not None:
+            if not isinstance(requested_roles, list):
+                return Response(
+                    {"roles": ["roles must be a list of role names."]},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            invalid_roles = [r for r in requested_roles if r not in valid_roles]
+            if invalid_roles:
+                return Response(
+                    {"roles": [f"Invalid role(s): {', '.join(invalid_roles)}. Valid choices are: {', '.join(valid_roles)}."]},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        if user_is_admin and requested_roles:
+            target_roles = requested_roles
+        else:
+            # HR Manager or omitted roles defaults to ['Employee']
+            target_roles = ['Employee']
+
         user = User.objects.create_user(
             username=username,
             password=password,
@@ -90,8 +115,12 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         employee.user = user
         employee.save(update_fields=['user'])
 
-        emp_group, _ = Group.objects.get_or_create(name='Employee')
-        user.groups.add(emp_group)
+        groups = []
+        for role_name in target_roles:
+            grp, _ = Group.objects.get_or_create(name=role_name)
+            groups.append(grp)
+
+        user.groups.set(groups)
 
         roles = list(user.groups.values_list('name', flat=True))
         return Response({
@@ -99,4 +128,5 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             "username": user.username,
             "roles": roles,
         }, status=status.HTTP_201_CREATED)
+
 

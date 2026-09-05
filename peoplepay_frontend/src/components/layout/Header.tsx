@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Bell, Search, Shield, LogOut, User as UserIcon, Palette, Sun, Moon, Sparkles } from 'lucide-react';
+import { Menu, Search, Shield, LogOut, User as UserIcon, Palette, Sun, Moon, Sparkles } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../context/ThemeContext';
 import { Avatar } from '../ui/Avatar';
@@ -45,7 +45,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileSidebar }) => {
         </div>
       </div>
 
-      {/* Right: Appearance Button, Role Badge, Notifications, User Profile */}
+      {/* Right: Appearance Button, Role Badge, User Profile */}
       <div className="flex items-center gap-3">
         {/* Global Appearance / Theme Trigger Button */}
         <button
@@ -67,17 +67,8 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileSidebar }) => {
           </span>
         </div>
 
-        {/* Notifications */}
-        <button
-          type="button"
-          className="relative p-2 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-surface-elevated)] transition-colors focus:outline-none cursor-pointer"
-          title="Notifications"
-        >
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[var(--brand-accent)] ring-2 ring-[var(--bg-surface)]" />
-        </button>
-
         <div className="h-5 w-px bg-[var(--border-color)] mx-1" />
+
 
         {/* User Profile Dropdown */}
         <Dropdown

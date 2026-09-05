@@ -15,6 +15,12 @@ class Contract(TimeStampedModel):
         EXPIRED = 'expired', 'Expired'
         CANCELLED = 'cancelled', 'Cancelled'
 
+    MANUAL_STATE_CHOICES = [
+        (State.DRAFT.value, State.DRAFT.label),
+        (State.RUNNING.value, State.RUNNING.label),
+        (State.CANCELLED.value, State.CANCELLED.label),
+    ]
+
     employee = models.ForeignKey(
         Employee,
         on_delete=models.CASCADE,
@@ -33,7 +39,7 @@ class Contract(TimeStampedModel):
     )
     state = models.CharField(
         max_length=20,
-        choices=State.choices,
+        choices=MANUAL_STATE_CHOICES,
         default=State.DRAFT
     )
     department = models.CharField(
@@ -54,19 +60,39 @@ class Contract(TimeStampedModel):
         verbose_name_plural = 'Contracts'
 
     def __str__(self):
-        return f"{self.employee.employee_code} - Contract ({self.state}) - {self.wage}"
+        return f"{self.employee.employee_code} - Contract ({self.effective_state}) - {self.wage}"
+
+    @property
+    def effective_state(self):
+        """
+        Derived contract status:
+        - If state == 'cancelled' -> 'cancelled'
+        - Elif state == 'draft' -> 'draft'
+        - Elif date_end is set AND date_end < today -> 'expired'
+        - Else -> 'running'
+        """
+        if self.state == self.State.CANCELLED:
+            return self.State.CANCELLED
+        elif self.state == self.State.DRAFT:
+            return self.State.DRAFT
+        elif self.date_end and self.date_end < date.today():
+            return self.State.EXPIRED
+        else:
+            return self.State.RUNNING
 
     def clean(self):
         super().clean()
         if self.date_end and self.date_start and self.date_end < self.date_start:
             raise ValidationError({'date_end': 'End date cannot be prior to start date.'})
 
+        emp_id = self.employee_id or (self.employee.id if getattr(self, 'employee', None) else None)
+
         # Overlap check for active 'running' contracts
-        if self.state == self.State.RUNNING and self.employee_id:
+        if self.effective_state == self.State.RUNNING and emp_id:
             qs = Contract.objects.filter(
-                employee_id=self.employee_id,
-                state=self.State.RUNNING
-            )
+                employee_id=emp_id
+            ).exclude(state__in=[self.State.CANCELLED, self.State.DRAFT])
+
             if self.pk:
                 qs = qs.exclude(pk=self.pk)
 
@@ -74,14 +100,16 @@ class Contract(TimeStampedModel):
             new_end = self.date_end or date.max
 
             for existing in qs:
-                existing_start = existing.date_start
-                existing_end = existing.date_end or date.max
+                if existing.effective_state == self.State.RUNNING:
+                    existing_start = existing.date_start
+                    existing_end = existing.date_end or date.max
 
-                # Overlap condition: new_start <= existing_end AND new_end >= existing_start
-                if new_start <= existing_end and new_end >= existing_start:
-                    raise ValidationError({
-                        'date_start': f"Employee already has an active running contract for period {existing_start} to {existing.date_end or 'Open-ended'}."
-                    })
+                    # Overlap condition: new_start <= existing_end AND new_end >= existing_start
+                    if new_start <= existing_end and new_end >= existing_start:
+                        raise ValidationError({
+                            'date_start': f"Employee already has an active running contract for period {existing_start} to {existing.date_end or 'Open-ended'}."
+                        })
+
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -89,10 +117,11 @@ class Contract(TimeStampedModel):
 
     def is_active_for_period(self, date_from, date_to):
         """
-        Returns True if this contract is running and covers the given date period.
+        Returns True if this contract is effectively running and covers the given date period.
         """
-        if self.state != self.State.RUNNING:
+        if self.effective_state != self.State.RUNNING:
             return False
 
         end_check = self.date_end or date.max
         return self.date_start <= date_to and end_check >= date_from
+

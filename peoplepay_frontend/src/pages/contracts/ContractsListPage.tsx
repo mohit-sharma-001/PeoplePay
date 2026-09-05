@@ -20,9 +20,9 @@ import { formatDate, formatCurrency } from '../../utils/formatters';
 const STATE_OPTIONS = [
   { value: 'draft', label: 'Draft' },
   { value: 'running', label: 'Running' },
-  { value: 'expired', label: 'Expired' },
   { value: 'cancelled', label: 'Cancelled' },
 ];
+
 
 export const ContractsListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -97,7 +97,9 @@ export const ContractsListPage: React.FC = () => {
     setWage(String(c.wage || ''));
     setDateStart(c.startDate ? c.startDate.split('T')[0] : new Date().toISOString().split('T')[0]);
     setDateEnd(c.endDate ? c.endDate.split('T')[0] : '');
-    setStateVal((c.status || 'Running').toLowerCase());
+    const statusLower = (c.status || 'Running').toLowerCase();
+    setStateVal(statusLower === 'expired' ? 'running' : statusLower);
+
     setDepartment(c.department || 'Engineering');
     setJobPosition(c.jobTitle || 'Software Engineer');
     setFieldErrors({});

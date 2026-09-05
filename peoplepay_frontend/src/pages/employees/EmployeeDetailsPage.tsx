@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   Loader2,
   Edit3,
+  Shield,
 } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
@@ -33,12 +34,25 @@ import { Select } from '../../components/ui/Select';
 import { employeesApi } from '../../services/api/employees';
 import { contractsApi } from '../../services/api/contracts';
 import { attendanceApi } from '../../services/api/attendance';
-import { ApiError } from '../../services/api/client';
+import { timeOffApi } from '../../services/api/timeoff';
+import { apiFetch, ApiError } from '../../services/api/client';
+import { authService } from '../../services/authService';
 import { useAuth } from '../../hooks/useAuth';
 import { Employee } from '../../types/employee';
 import { Contract } from '../../types/contract';
 import { Attendance } from '../../types/attendance';
+import { TimeOffAllocation } from '../../types/timeoff';
 import { formatDate, formatCurrency } from '../../utils/formatters';
+
+const SYSTEM_ROLE_OPTIONS = [
+  { value: 'Employee', label: 'Employee' },
+  { value: 'HR Manager', label: 'HR Manager' },
+  { value: 'HR Payroll User', label: 'HR Payroll User' },
+  { value: 'HR Payroll Manager', label: 'HR Payroll Manager' },
+  { value: 'Admin', label: 'Admin' },
+];
+
+
 
 function generateSecurePassword() {
   const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
@@ -100,6 +114,23 @@ export const EmployeeDetailsPage: React.FC = () => {
   const [jobPosition, setJobPosition] = useState('');
   const [dateJoined, setDateJoined] = useState('');
   const [statusVal, setStatusVal] = useState('active');
+  const [allocations, setAllocations] = useState<TimeOffAllocation[]>([]);
+  const [userAccountInfo, setUserAccountInfo] = useState<{ username: string; roles: string[] } | null>(null);
+
+  // User Account ID & Role State
+  const [userAccountId, setUserAccountId] = useState<number | string | null>(null);
+  const [selectedCreateRole, setSelectedCreateRole] = useState('Employee');
+
+  // Change Role Modal State (Admin Only)
+  const [isChangeRoleModalOpen, setIsChangeRoleModalOpen] = useState(false);
+  const [selectedChangeRole, setSelectedChangeRole] = useState('Employee');
+  const [isAssigningRole, setIsAssigningRole] = useState(false);
+  const [changeRoleError, setChangeRoleError] = useState<string | null>(null);
+
+  const isAdmin = Boolean(
+    currentUser?.roles?.some((r) => r === 'Admin') ||
+    currentUser?.role === 'Admin'
+  );
 
   const loadEmployeeData = async () => {
     setIsLoading(true);
@@ -108,12 +139,33 @@ export const EmployeeDetailsPage: React.FC = () => {
     setEmployee(empRes.data);
 
     if (empRes.data) {
-      const [conRes, attRes] = await Promise.all([
+      const [conRes, attRes, alcRes, usrRes] = await Promise.all([
         contractsApi.getByEmployeeId(empRes.data.id),
         attendanceApi.getByEmployeeId(empRes.data.id),
+        timeOffApi.getAllocationsByEmployee(empRes.data.id),
+        apiFetch<any[]>(`/api/auth/users/?employee_id=${empRes.data.id}`),
       ]);
       setContract(conRes.data);
       setAttendance(attRes.data);
+      setAllocations(alcRes.data || []);
+
+      if (Array.isArray(usrRes.data) && usrRes.data.length > 0) {
+        const uObj = usrRes.data[0];
+        setUserAccountId(uObj.id);
+        setUserAccountInfo({
+          username: uObj.username,
+          roles: uObj.roles || ['Employee'],
+        });
+      } else if (empRes.data.user) {
+        setUserAccountId((empRes.data.user as any).id || null);
+        setUserAccountInfo({
+          username: empRes.data.user.username || 'Linked User',
+          roles: (empRes.data.user as any).roles || ['Employee'],
+        });
+      } else {
+        setUserAccountId(null);
+        setUserAccountInfo(null);
+      }
     }
     setIsLoading(false);
   };
@@ -137,6 +189,7 @@ export const EmployeeDetailsPage: React.FC = () => {
     setUsername(defaultUsername);
     setPassword(generateSecurePassword());
     setShowPassword(true);
+    setSelectedCreateRole('Employee');
     setCreateError(null);
     setCreatedCredentials(null);
     setCopied(false);
@@ -158,11 +211,16 @@ export const EmployeeDetailsPage: React.FC = () => {
     setIsSubmitting(true);
     setCreateError(null);
 
+    const payload: any = {
+      username: username.trim(),
+      password: password.trim(),
+    };
+    if (isAdmin && selectedCreateRole) {
+      payload.roles = [selectedCreateRole];
+    }
+
     try {
-      const res = await employeesApi.createLogin(id, {
-        username: username.trim(),
-        password: password.trim(),
-      });
+      const res = await employeesApi.createLogin(id, payload);
 
       if ((res.status >= 200 && res.status < 300) || res.data) {
         const credentials = {
@@ -170,7 +228,7 @@ export const EmployeeDetailsPage: React.FC = () => {
           password: password.trim(),
         };
         setCreatedCredentials(credentials);
-        setEmployee((prev) => (prev ? { ...prev, user: { username: credentials.username } } : null));
+        await loadEmployeeData();
       } else {
         setCreateError(res.message || 'Failed to create user login credentials.');
       }
@@ -180,6 +238,40 @@ export const EmployeeDetailsPage: React.FC = () => {
       setIsSubmitting(false);
     }
   };
+
+  const handleOpenChangeRoleModal = () => {
+    const currentRole = (userAccountInfo?.roles && userAccountInfo.roles[0]) || 'Employee';
+    setSelectedChangeRole(currentRole);
+    setChangeRoleError(null);
+    setIsChangeRoleModalOpen(true);
+  };
+
+  const handleChangeRoleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userAccountId) {
+      setChangeRoleError('No linked user account ID found for role assignment.');
+      return;
+    }
+    setIsAssigningRole(true);
+    setChangeRoleError(null);
+
+    try {
+      const res = await authService.assignRole(userAccountId, selectedChangeRole);
+      if (res.success) {
+        setToastMessage(`User role updated to "${selectedChangeRole}" successfully!`);
+        setIsChangeRoleModalOpen(false);
+        await loadEmployeeData();
+        setTimeout(() => setToastMessage(null), 4000);
+      } else {
+        setChangeRoleError(res.error || 'Failed to reassign user role.');
+      }
+    } catch (err: any) {
+      setChangeRoleError(err.message || 'An error occurred while updating user role.');
+    } finally {
+      setIsAssigningRole(false);
+    }
+  };
+
 
   const handleCopyCredentials = () => {
     if (!createdCredentials) return;
@@ -353,66 +445,200 @@ export const EmployeeDetailsPage: React.FC = () => {
 
       {/* Tab Content Panels */}
       {activeTab === 'overview' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Employment Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 text-xs">
-              <div className="flex justify-between border-b border-slate-100 pb-2">
-                <span className="text-slate-500 font-medium">Department</span>
-                <span className="font-semibold text-slate-900">{employee.department}</span>
-              </div>
-              <div className="flex justify-between border-b border-slate-100 pb-2">
-                <span className="text-slate-500 font-medium">Job Title</span>
-                <span className="font-semibold text-slate-900">{employee.jobTitle}</span>
-              </div>
-              <div className="flex justify-between border-b border-slate-100 pb-2">
-                <span className="text-slate-500 font-medium">Manager</span>
-                <span className="font-semibold text-slate-900">{employee.managerName || 'None'}</span>
-              </div>
-              <div className="flex justify-between border-b border-slate-100 pb-2">
-                <span className="text-slate-500 font-medium">Joining Date</span>
-                <span className="font-semibold text-slate-900">{formatDate(employee.joiningDate)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500 font-medium">Working Schedule</span>
-                <span className="font-semibold text-blue-600">{employee.workingScheduleName}</span>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* 1. Basic Info Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle>1. Basic Identity & Employment Info</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-xs">
+                <div className="flex justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-500 font-medium">Full Name</span>
+                  <span className="font-bold text-slate-900">{employee.firstName} {employee.lastName}</span>
+                </div>
+                <div className="flex justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-500 font-medium">Employee Code</span>
+                  <span className="font-mono font-semibold text-slate-900">{employee.code}</span>
+                </div>
+                <div className="flex justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-500 font-medium">Department</span>
+                  <span className="font-semibold text-slate-900">{employee.department}</span>
+                </div>
+                <div className="flex justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-500 font-medium">Job Position</span>
+                  <span className="font-semibold text-slate-900">{employee.jobTitle}</span>
+                </div>
+                <div className="flex justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-500 font-medium">Status</span>
+                  <StatusBadge status={employee.status} size="sm" />
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-medium">Date Joined</span>
+                  <span className="font-semibold text-slate-900">{formatDate(employee.joiningDate)}</span>
+                </div>
+              </CardContent>
+            </Card>
 
+            {/* 2. User Account & Roles Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle>2. System Access & User Role(s)</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 text-xs">
+                {userAccountInfo || employee.user ? (
+                  <>
+                    <div className="flex justify-between border-b border-slate-100 pb-2">
+                      <span className="text-slate-500 font-medium">Account Username</span>
+                      <span className="font-mono font-bold text-slate-900">{userAccountInfo?.username || employee.user?.username}</span>
+                    </div>
+                    <div className="space-y-1.5 border-b border-slate-100 pb-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 font-medium block">Assigned Role(s)</span>
+                        {isAdmin && userAccountId && (
+                          <button
+                            type="button"
+                            onClick={handleOpenChangeRoleModal}
+                            className="text-xs text-[var(--brand-primary)] hover:underline font-medium flex items-center gap-1 cursor-pointer"
+                          >
+                            <Shield className="w-3.5 h-3.5" /> Change Role
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(userAccountInfo?.roles || ['Employee']).map((r) => (
+                          <span key={r} className="px-2.5 py-1 rounded-md text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                            {r}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-emerald-700 font-medium bg-emerald-50 p-2.5 rounded-lg border border-emerald-200">
+                      <UserCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>Portal Login Linked</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-slate-500">No login account is currently linked to this employee profile.</p>
+                    {canCreateLogin && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleOpenCreateModal}
+                        className="border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-semibold flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Key className="w-4 h-4 text-emerald-600" />
+                        Create Portal Login Now
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* 3. Active Contract Summary Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle>3. Active Contract Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-xs">
+                {contract ? (
+                  <>
+                    <div className="flex justify-between border-b border-slate-100 pb-2">
+                      <span className="text-slate-500 font-medium">Contract Ref</span>
+                      <span className="font-mono font-bold text-slate-900">{contract.reference}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-100 pb-2">
+                      <span className="text-slate-500 font-medium">Contract Status</span>
+                      <StatusBadge status={contract.status} size="sm" />
+                    </div>
+                    <div className="flex justify-between border-b border-slate-100 pb-2">
+                      <span className="text-slate-500 font-medium">Monthly Gross Wage</span>
+                      <span className="font-bold text-blue-600 text-sm">{formatCurrency(contract.wage)}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-100 pb-2">
+                      <span className="text-slate-500 font-medium">Validity Period</span>
+                      <span className="font-semibold text-slate-900">
+                        {formatDate(contract.startDate)} {contract.endDate ? `to ${formatDate(contract.endDate)}` : '(Indefinite)'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-medium">Salary Structure</span>
+                      <span className="font-semibold text-purple-600">{contract.salaryStructureName}</span>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-slate-500">No active contract assigned to this employee.</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 4. Working Schedule Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle>4. Working Schedule & Hours</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-xs">
+                <div className="flex justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-500 font-medium">Schedule Name</span>
+                  <span className="font-semibold text-blue-600">{employee.workingScheduleName || 'Standard 40h Shift'}</span>
+                </div>
+                <div className="flex justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-500 font-medium">Total Weekly Hours</span>
+                  <span className="font-bold text-slate-900">40.0 hrs / week</span>
+                </div>
+                <div className="flex justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-500 font-medium">Standard Shift</span>
+                  <span className="font-medium text-slate-800">09:00 AM - 05:00 PM (Mon-Fri)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-medium">Overtime Allowance</span>
+                  <span className="font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">Standard Overtime</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* 5. Leave Balances Card */}
           <Card>
             <CardHeader>
-              <CardTitle>Active Contract Summary</CardTitle>
+              <CardTitle>5. Leave Balances & Allocation Summaries</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 text-xs">
-              {contract ? (
-                <>
-                  <div className="flex justify-between border-b border-slate-100 pb-2">
-                    <span className="text-slate-500 font-medium">Contract Ref</span>
-                    <span className="font-mono font-semibold text-slate-900">{contract.reference}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-100 pb-2">
-                    <span className="text-slate-500 font-medium">Contract Type</span>
-                    <span className="font-semibold text-slate-900">{contract.contractType}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-100 pb-2">
-                    <span className="text-slate-500 font-medium">Monthly Wage</span>
-                    <span className="font-bold text-slate-900 text-sm">{formatCurrency(contract.wage)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 font-medium">Salary Structure</span>
-                    <span className="font-semibold text-purple-600">{contract.salaryStructureName}</span>
-                  </div>
-                </>
+            <CardContent>
+              {allocations.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                  {allocations.map((alc) => (
+                    <div key={alc.id} className="p-4 rounded-xl bg-[var(--bg-surface-elevated)] border border-[var(--border-color)] space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-900">{alc.timeOffTypeName}</span>
+                        <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                          {alc.remainingDays} / {alc.allocatedDays} days remaining
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="bg-emerald-500 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${Math.min(100, Math.max(0, (alc.remainingDays / (alc.allocatedDays || 1)) * 100))}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-[11px] text-slate-500 font-mono">
+                        <span>Used: {alc.usedDays} days</span>
+                        <span>Allocated: {alc.allocatedDays} days</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : (
-                <p className="text-slate-500">No active contract assigned to this employee.</p>
+                <p className="text-xs text-slate-500">No leave allocations found for this employee.</p>
               )}
             </CardContent>
           </Card>
         </div>
       )}
+
 
       {activeTab === 'contract' && (
         <Card>
@@ -594,7 +820,18 @@ export const EmployeeDetailsPage: React.FC = () => {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              <p className="text-[11px] text-[var(--text-muted)] mt-1">Will be automatically assigned the Employee role.</p>
+              {isAdmin ? (
+                <div className="mt-3">
+                  <Select
+                    label="Assign Initial System Role *"
+                    options={SYSTEM_ROLE_OPTIONS}
+                    value={selectedCreateRole}
+                    onChange={(e) => setSelectedCreateRole(e.target.value)}
+                  />
+                </div>
+              ) : (
+                <p className="text-[11px] text-[var(--text-muted)] mt-1">Will be automatically assigned the Employee role.</p>
+              )}
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-color)]">
@@ -607,6 +844,42 @@ export const EmployeeDetailsPage: React.FC = () => {
             </div>
           </form>
         )}
+      </Modal>
+
+      {/* Change Role Modal */}
+      <Modal
+        isOpen={isChangeRoleModalOpen}
+        onClose={() => {
+          if (!isAssigningRole) setIsChangeRoleModalOpen(false);
+        }}
+        title="Change User Account Role"
+        description={`Reassign system permissions for user "${userAccountInfo?.username || employee.user?.username}"`}
+        maxWidth="md"
+      >
+        <form onSubmit={handleChangeRoleSubmit} className="space-y-4 text-xs">
+          {changeRoleError && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+              <span>{changeRoleError}</span>
+            </div>
+          )}
+
+          <Select
+            label="System Role *"
+            options={SYSTEM_ROLE_OPTIONS}
+            value={selectedChangeRole}
+            onChange={(e) => setSelectedChangeRole(e.target.value)}
+          />
+
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-color)]">
+            <Button type="button" variant="outline" size="sm" onClick={() => setIsChangeRoleModalOpen(false)} disabled={isAssigningRole}>
+              Cancel
+            </Button>
+            <Button type="submit" size="sm" isLoading={isAssigningRole}>
+              Update Role
+            </Button>
+          </div>
+        </form>
       </Modal>
 
       {/* Edit Profile Modal */}
