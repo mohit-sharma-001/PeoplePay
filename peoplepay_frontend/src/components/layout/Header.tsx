@@ -4,23 +4,24 @@ import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../context/ThemeContext';
 import { Avatar } from '../ui/Avatar';
 import { Dropdown } from '../ui/Dropdown';
-import { Role } from '../../types/auth';
 
 export interface HeaderProps {
   onOpenMobileSidebar: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ onOpenMobileSidebar }) => {
-  const { user, logout, switchRole } = useAuth();
+  const { user, logout } = useAuth();
   const { themeMode, openSettings } = useTheme();
-
-  const availableRoles: Role[] = ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User', 'Employee'];
 
   const getThemeIcon = () => {
     if (themeMode === 'dark') return <Moon className="w-4 h-4 text-purple-400" />;
     if (themeMode === 'custom') return <Sparkles className="w-4 h-4 text-[#F59E0B]" />;
     return <Sun className="w-4 h-4 text-amber-500" />;
   };
+
+  const displayRoles = Array.isArray(user?.roles) && user.roles.length > 0
+    ? user.roles.join(', ')
+    : (user?.role || 'Employee');
 
   return (
     <header className="h-16 bg-[var(--header-bg)] border-b border-[var(--border-color)] px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-2xs transition-colors duration-200">
@@ -44,7 +45,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileSidebar }) => {
         </div>
       </div>
 
-      {/* Right: Appearance Button, Role Selector, Notifications, User Profile */}
+      {/* Right: Appearance Button, Role Badge, Notifications, User Profile */}
       <div className="flex items-center gap-3">
         {/* Global Appearance / Theme Trigger Button */}
         <button
@@ -57,21 +58,13 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileSidebar }) => {
           <span className="hidden sm:inline capitalize">{themeMode}</span>
         </button>
 
-        {/* Quick Role Switcher */}
-        <div className="hidden sm:flex items-center gap-1.5 bg-[var(--brand-primary-light)] px-2.5 py-1 rounded-lg border border-[var(--brand-primary-border)] text-xs">
-          <Shield className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
+        {/* Real User Role Badge (Role Switcher Removed) */}
+        <div className="hidden sm:flex items-center gap-1.5 bg-[var(--brand-primary-light)] px-2.5 py-1.5 rounded-lg border border-[var(--brand-primary-border)] text-xs">
+          <Shield className="w-3.5 h-3.5 text-[var(--brand-primary)] shrink-0" />
           <span className="text-[var(--text-secondary)] font-medium">Role:</span>
-          <select
-            value={user?.role || 'Admin'}
-            onChange={(e) => switchRole(e.target.value as Role)}
-            className="bg-transparent font-semibold text-[var(--brand-primary)] focus:outline-none cursor-pointer"
-          >
-            {availableRoles.map((r) => (
-              <option key={r} value={r} className="bg-[var(--bg-surface)] text-[var(--text-primary)]">
-                {r}
-              </option>
-            ))}
-          </select>
+          <span className="font-bold text-[var(--brand-primary)] truncate max-w-[140px]" title={displayRoles}>
+            {displayRoles}
+          </span>
         </div>
 
         {/* Notifications */}
@@ -91,17 +84,17 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileSidebar }) => {
           align="right"
           trigger={
             <div className="flex items-center gap-2.5 cursor-pointer p-1 rounded-lg hover:bg-[var(--bg-surface-elevated)] transition-colors">
-              <Avatar src={user?.avatarUrl} name={user?.name || 'User'} size="sm" />
+              <Avatar src={user?.avatarUrl} name={user?.name || user?.username || 'User'} size="sm" />
               <div className="hidden md:flex flex-col text-left leading-none">
-                <span className="text-xs font-semibold text-[var(--text-primary)]">{user?.name}</span>
-                <span className="text-[10px] text-[var(--text-secondary)] mt-0.5">{user?.role}</span>
+                <span className="text-xs font-semibold text-[var(--text-primary)]">{user?.name || user?.username}</span>
+                <span className="text-[10px] text-[var(--text-secondary)] mt-0.5">{displayRoles}</span>
               </div>
             </div>
           }
           items={[
             {
               id: 'profile',
-              label: user?.email || '',
+              label: user?.email || user?.username || '',
               icon: <UserIcon className="w-4 h-4" />,
               disabled: true,
             },
@@ -114,7 +107,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileSidebar }) => {
             },
             {
               id: 'role-info',
-              label: `Role: ${user?.role}`,
+              label: `Role: ${displayRoles}`,
               icon: <Shield className="w-4 h-4 text-[var(--brand-primary)]" />,
               disabled: true,
             },

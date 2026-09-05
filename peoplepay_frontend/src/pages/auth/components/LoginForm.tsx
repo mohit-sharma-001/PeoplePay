@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, AlertCircle, ArrowRight, Loader2, Info } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 
@@ -157,10 +158,13 @@ export const LoginForm: React.FC<LoginFormProps> = ({
           )}
         </button>
 
-        {/* Secondary Text */}
+        {/* Secondary Text Link to Register */}
         <div className="pt-3 text-center border-t border-[#175A67]/10">
           <p className="text-xs text-[#2A707C]">
-            Don't have an account? <span className="font-semibold text-[#175A67] underline cursor-pointer hover:text-[#714B67]">Contact your administrator</span>.
+            Don't have an account?{' '}
+            <Link to="/register" className="font-bold text-[#175A67] underline hover:text-[#714B67]">
+              Register
+            </Link>
           </p>
         </div>
       </form>

@@ -55,6 +55,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setOpenSubmenus((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const isAdmin = user?.roles?.includes('Admin') || user?.role === 'Admin';
+
   const navItems: NavItem[] = [
     {
       label: 'Overview',
@@ -109,6 +111,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
       path: '/reports',
       icon: <BarChart3 className="w-4 h-4" />,
     },
+    ...(isAdmin
+      ? [
+          {
+            label: 'Manage Users',
+            path: '/admin/users',
+            icon: <ShieldCheck className="w-4 h-4" />,
+          },
+        ]
+      : []),
   ];
 
   return (

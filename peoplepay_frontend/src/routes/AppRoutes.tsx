@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppLayout } from '../layouts/AppLayout';
 import { ProtectedRoute } from './ProtectedRoute';
 import { LoginPage } from '../pages/auth/LoginPage';
+import { RegisterPage } from '../pages/auth/RegisterPage';
 import { DashboardPage } from '../pages/dashboard/DashboardPage';
 import { EmployeesListPage } from '../pages/employees/EmployeesListPage';
 import { EmployeeDetailsPage } from '../pages/employees/EmployeeDetailsPage';
@@ -23,12 +24,14 @@ import { PayslipDetailsPage } from '../pages/payroll/PayslipDetailsPage';
 import { StructuresListPage } from '../pages/payroll/StructuresListPage';
 import { RulesListPage } from '../pages/payroll/RulesListPage';
 import { ReportsPage } from '../pages/reports/ReportsPage';
+import { ManageUsersPage } from '../pages/admin/ManageUsersPage';
 
 export const AppRoutes: React.FC = () => {
   return (
     <Routes>
-      {/* Public Auth Route */}
+      {/* Public Auth Routes */}
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
 
       {/* Protected Application Routes */}
       <Route
@@ -41,6 +44,9 @@ export const AppRoutes: React.FC = () => {
       >
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
+
+        {/* Admin Management */}
+        <Route path="admin/users" element={<ManageUsersPage />} />
 
         {/* Employees */}
         <Route path="employees" element={<EmployeesListPage />} />
