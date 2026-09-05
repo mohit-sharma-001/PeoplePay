@@ -22,6 +22,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         'retrieve': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User', 'Employee'],
         'check_in': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User', 'Employee'],
         'check_out': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User', 'Employee'],
+        'my_status': ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User', 'Employee'],
         'create': ['Admin', 'HR Manager'],
         'update': ['Admin', 'HR Manager'],
         'partial_update': ['Admin', 'HR Manager'],
@@ -126,6 +127,40 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         return api_response(
             data=serializer.data,
             message="Check-out successful."
+        )
+
+    @action(detail=False, methods=['get'], url_path='my-status')
+    def my_status(self, request):
+        """
+        GET /api/attendance/my-status/
+        Returns current open attendance record (if any) for the logged-in user's linked employee.
+        """
+        user = request.user
+        if not hasattr(user, 'employee_profile') or not user.employee_profile:
+            return api_response(
+                data={"has_open_checkin": False, "attendance": None},
+                message="No linked employee profile."
+            )
+
+        employee = user.employee_profile
+        open_record = Attendance.objects.filter(
+            employee=employee,
+            check_out__isnull=True
+        ).order_by('-check_in').first()
+
+        if open_record:
+            serializer = self.get_serializer(open_record)
+            return api_response(
+                data={
+                    "has_open_checkin": True,
+                    "attendance": serializer.data
+                },
+                message="Open check-in record found."
+            )
+
+        return api_response(
+            data={"has_open_checkin": False, "attendance": None},
+            message="No open check-in record."
         )
 
     @action(detail=True, methods=['post'], url_path='approve-correction')

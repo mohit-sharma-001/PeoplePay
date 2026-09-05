@@ -232,4 +232,111 @@ class EmployeeAPITestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('roles', response.data)
 
+    def test_terminate_employee_success(self):
+        from contracts.models import Contract
+        contract = Contract.objects.create(
+            employee=self.employee,
+            wage=5000,
+            department=Employee.Department.ENGINEERING,
+            job_position='Software Director',
+            date_start=date(2023, 1, 1),
+            state='running'
+        )
+
+        self.client.force_authenticate(user=self.user)
+        res = self.client.post(
+            f'/api/employees/{self.employee.id}/terminate/',
+            {'reason': 'Moving to another company'},
+            format='json'
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data['status'], 'terminated')
+        self.assertEqual(res.data['termination_reason'], 'Moving to another company')
+        self.assertIsNotNone(res.data['terminated_at'])
+
+        self.employee.refresh_from_db()
+        self.assertEqual(self.employee.status, 'terminated')
+        self.assertFalse(self.employee.user.is_active)
+
+        contract.refresh_from_db()
+        self.assertEqual(contract.date_end, date.today())
+
+    def test_disabled_user_login_attempt(self):
+        self.employee.user.is_active = False
+        self.employee.user.save()
+
+        res = self.client.post('/api/auth/login/', {
+            'username': 'testuser',
+            'password': 'Password123!'
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(res.data['message'], 'This account has been disabled.')
+
+    def test_terminate_already_terminated_returns_400(self):
+        self.employee.status = Employee.Status.TERMINATED
+        self.employee.save()
+
+        self.client.force_authenticate(user=self.user)
+        res = self.client.post(f'/api/employees/{self.employee.id}/terminate/', {}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_reactivate_employee_success(self):
+        from contracts.models import Contract
+        self.employee.status = Employee.Status.TERMINATED
+        self.employee.user.is_active = False
+        self.employee.user.save()
+        self.employee.save()
+
+        contract = Contract.objects.create(
+            employee=self.employee,
+            wage=5000,
+            department=Employee.Department.ENGINEERING,
+            job_position='Software Director',
+            date_start=date(2023, 1, 1),
+            date_end=date.today(),
+            state='running'
+        )
+
+        self.client.force_authenticate(user=self.user)
+        res = self.client.post(f'/api/employees/{self.employee.id}/reactivate/', {}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data['status'], 'active')
+
+        self.employee.refresh_from_db()
+        self.assertEqual(self.employee.status, 'active')
+        self.assertTrue(self.employee.user.is_active)
+
+        contract.refresh_from_db()
+        self.assertEqual(contract.date_end, date.today())
+
+
+    def test_reactivate_non_terminated_returns_400(self):
+        self.client.force_authenticate(user=self.user)
+        res = self.client.post(f'/api/employees/{self.employee.id}/reactivate/', {}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_termination_and_reactivation_permissions(self):
+        emp_user = User.objects.create_user(username='plain_emp_user3', password='Password123!')
+        emp_user.groups.add(self.emp_group)
+
+        hr_user = User.objects.create_user(username='hr_mgr_user', password='Password123!')
+        hr_user.groups.add(self.hr_group)
+
+        # Plain employee cannot terminate or reactivate
+        self.client.force_authenticate(user=emp_user)
+        res_term = self.client.post(f'/api/employees/{self.employee.id}/terminate/', {}, format='json')
+        self.assertEqual(res_term.status_code, status.HTTP_403_FORBIDDEN)
+
+        res_react = self.client.post(f'/api/employees/{self.employee.id}/reactivate/', {}, format='json')
+        self.assertEqual(res_react.status_code, status.HTTP_403_FORBIDDEN)
+
+        # HR Manager can terminate but NOT reactivate
+        self.client.force_authenticate(user=hr_user)
+        res_hr_term = self.client.post(f'/api/employees/{self.employee.id}/terminate/', {}, format='json')
+        self.assertEqual(res_hr_term.status_code, status.HTTP_200_OK)
+
+        res_hr_react = self.client.post(f'/api/employees/{self.employee.id}/reactivate/', {}, format='json')
+        self.assertEqual(res_hr_react.status_code, status.HTTP_403_FORBIDDEN)
+
+
 

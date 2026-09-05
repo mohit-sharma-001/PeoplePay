@@ -26,10 +26,71 @@ class TimeOffTypeViewSet(viewsets.ModelViewSet):
         'update': ['Admin', 'HR Manager'],
         'partial_update': ['Admin', 'HR Manager'],
         'destroy': ['Admin', 'HR Manager'],
+        'bulk_allocate': ['Admin', 'HR Manager'],
     }
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['name']
     ordering_fields = ['name', 'created_at']
+
+    @action(detail=True, methods=['post'], url_path='bulk-allocate')
+    def bulk_allocate(self, request, pk=None):
+        time_off_type = self.get_object()
+        data = request.data or {}
+
+        allocated_amount = data.get('allocated_amount')
+        valid_from = data.get('valid_from')
+        valid_until = data.get('valid_until')
+
+        if allocated_amount is None or not valid_from:
+            return api_response(
+                message="Validation error.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+                errors={"payload": "allocated_amount and valid_from are required."}
+            )
+
+        try:
+            allocated_amount = float(allocated_amount)
+            if allocated_amount <= 0:
+                raise ValueError()
+        except (ValueError, TypeError):
+            return api_response(
+                message="Validation error.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+                errors={"allocated_amount": "allocated_amount must be a positive number."}
+            )
+
+        from django.db.models import Q
+        from employees.models import Employee
+
+        active_employees = Employee.objects.filter(status__iexact=Employee.Status.ACTIVE)
+
+        created_count = 0
+        skipped_count = 0
+
+        for emp in active_employees:
+            overlap_q = Q(employee=emp, time_off_type=time_off_type)
+            overlap_q &= Q(valid_until__isnull=True) | Q(valid_until__gte=valid_from)
+            if valid_until:
+                overlap_q &= Q(valid_from__lte=valid_until)
+
+            existing_alloc = TimeOffAllocation.objects.filter(overlap_q).exists()
+            if existing_alloc:
+                skipped_count += 1
+            else:
+                TimeOffAllocation.objects.create(
+                    employee=emp,
+                    time_off_type=time_off_type,
+                    allocated_amount=allocated_amount,
+                    valid_from=valid_from,
+                    valid_until=valid_until,
+                    state=TimeOffAllocation.State.CONFIRMED
+                )
+                created_count += 1
+
+        return api_response(
+            data={"created": created_count, "skipped": skipped_count},
+            message=f"Bulk allocation complete: {created_count} created, {skipped_count} skipped."
+        )
 
 
 class TimeOffAllocationViewSet(viewsets.ModelViewSet):

@@ -131,12 +131,7 @@ export const DashboardPage: React.FC = () => {
                   {latestPayrun && <StatusBadge status={latestPayrun.status} size="sm" />}
                 </div>
                 <span className="text-xs text-[var(--text-secondary)] mt-0.5 block font-semibold">
-                  {latestPayrun ? formatCurrency(latestPayrun.totalNet) : formatCurrency(63525)} Net
-                </span>
-              </div>
-              <div className="pt-1">
-                <span className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
-                  Demo data — backend not yet connected
+                  {latestPayrun ? formatCurrency(Number(latestPayrun.totalNet) || 0) : formatCurrency(0)} Net
                 </span>
               </div>
             </CardContent>

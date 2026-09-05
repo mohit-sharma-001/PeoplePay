@@ -29,6 +29,8 @@ class EmployeeSerializer(serializers.ModelSerializer):
             'user',
             'date_joined',
             'status',
+            'termination_reason',
+            'terminated_at',
             'created_at',
             'updated_at',
         ]

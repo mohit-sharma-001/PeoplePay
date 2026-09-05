@@ -10,14 +10,14 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'md' })
   const getBadgeConfig = (statusStr: string): { variant: BadgeProps['variant']; label: string } => {
     const s = statusStr.toLowerCase();
 
-    // Success / Running / Approved / Active / Paid
-    if (['active', 'running', 'approved', 'paid', 'done', 'present'].includes(s)) {
+    // Success / Running / Approved / Active / Paid / Validated
+    if (['active', 'running', 'approved', 'paid', 'validated', 'done', 'present'].includes(s)) {
       return { variant: 'emerald', label: statusStr };
     }
 
-    // Warning / Pending / To Approve / In Progress / Late / Half Day
-    if (['pending', 'to approve', 'in progress', 'late', 'half day', 'probation'].includes(s)) {
-      return { variant: 'orange', label: statusStr };
+    // Warning / Pending / To Approve / In Progress / Computed / Late / Half Day
+    if (['pending', 'to approve', 'in progress', 'computed', 'late', 'half day', 'probation'].includes(s)) {
+      return { variant: 'purple', label: statusStr };
     }
 
     // Danger / Refused / Terminated / Expired / Cancelled / Absent

@@ -200,13 +200,14 @@ class TimeOffRequest(TimeStampedModel):
     @property
     def duration(self):
         """
-        Dynamically calculates request duration in inclusive calendar days.
+        Dynamically calculates request duration in working days (excluding weekends & Indian national holidays).
         """
         if not self.date_from or not self.date_to:
             return 0
         if self.date_to < self.date_from:
             return 0
-        return (self.date_to - self.date_from).days + 1
+        from time_off.holidays import calculate_working_days
+        return calculate_working_days(self.date_from, self.date_to)
 
     @property
     def warning_message(self):

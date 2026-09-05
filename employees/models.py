@@ -66,6 +66,8 @@ class Employee(TimeStampedModel):
         related_name='employees',
         help_text="Assigned shift schedule for expected working hours"
     )
+    termination_reason = models.TextField(blank=True, null=True)
+    terminated_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         ordering = ['employee_code']

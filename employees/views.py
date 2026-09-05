@@ -2,6 +2,7 @@ from rest_framework import viewsets, filters, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.contrib.auth.models import User, Group
+from django.utils import timezone
 from core.permissions import HasRole, is_employee_only
 from employees.models import Employee
 from employees.serializers import EmployeeSerializer
@@ -25,6 +26,8 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         'partial_update': ['Admin', 'HR Manager'],
         'destroy': ['Admin', 'HR Manager'],
         'create_login': ['Admin', 'HR Manager'],
+        'terminate': ['Admin', 'HR Manager'],
+        'reactivate': ['Admin'],
     }
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['first_name', 'last_name', 'employee_code', 'email', 'job_position']
@@ -128,5 +131,68 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             "username": user.username,
             "roles": roles,
         }, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'], url_path='terminate')
+    def terminate(self, request, pk=None):
+        """
+        POST /api/employees/{id}/terminate/
+        Terminates employee, sets running contract date_end to today, disables linked user login.
+        Restricted to Admin and HR Manager.
+        """
+        employee = self.get_object()
+
+        if employee.status == Employee.Status.TERMINATED:
+            return Response(
+                {"detail": "This employee is already terminated."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        reason = request.data.get('reason', '')
+        employee.status = Employee.Status.TERMINATED
+        employee.termination_reason = reason
+        employee.terminated_at = timezone.now()
+        employee.save(update_fields=['status', 'termination_reason', 'terminated_at', 'updated_at'])
+
+        # Close running contract date_end to today
+        today = timezone.now().date()
+        from contracts.models import Contract
+        contracts = Contract.objects.filter(employee=employee)
+        for c in contracts:
+            if c.effective_state == 'running':
+                c.date_end = today
+                c.save(update_fields=['date_end', 'updated_at'])
+
+        # Disable linked user account if present
+        if employee.user:
+            employee.user.is_active = False
+            employee.user.save(update_fields=['is_active'])
+
+        serializer = self.get_serializer(employee)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='reactivate')
+    def reactivate(self, request, pk=None):
+        """
+        POST /api/employees/{id}/reactivate/
+        Reactivates employee and re-enables linked user account login.
+        Restricted to Admin ONLY (not HR Manager).
+        """
+        employee = self.get_object()
+
+        if employee.status != Employee.Status.TERMINATED:
+            return Response(
+                {"detail": "This employee is not currently terminated."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        employee.status = Employee.Status.ACTIVE
+        employee.save(update_fields=['status', 'updated_at'])
+
+        if employee.user:
+            employee.user.is_active = True
+            employee.user.save(update_fields=['is_active'])
+
+        serializer = self.get_serializer(employee)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 

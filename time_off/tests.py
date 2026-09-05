@@ -89,9 +89,10 @@ class TimeOffModuleTestCase(TestCase):
             'reason': 'Long international trip'
         }, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data['duration'], 15)
+        # Mon Jun 1 to Mon Jun 15 includes 11 working days (excluding Sat/Sun Jun 6-7, 13-14)
+        self.assertEqual(response.data['duration'], 11)
         self.assertEqual(float(response.data['paid_duration']), 10.0)
-        self.assertEqual(float(response.data['unpaid_duration']), 5.0)
+        self.assertEqual(float(response.data['unpaid_duration']), 1.0)
         self.assertIsNotNone(response.data['warning_message'])
         self.assertIn("10.0 day(s) will be covered by Paid Time Off", response.data['warning_message'])
 
@@ -113,7 +114,7 @@ class TimeOffModuleTestCase(TestCase):
         self.assertEqual(req.status, TimeOffRequest.Status.APPROVED)
         self.assertIsNotNone(req.overflow_unpaid_request)
         self.assertEqual(req.overflow_unpaid_request.status, TimeOffRequest.Status.APPROVED)
-        self.assertEqual(float(req.overflow_unpaid_request.unpaid_duration), 5.0)
+        self.assertEqual(float(req.overflow_unpaid_request.unpaid_duration), 1.0)
 
         self.pto_alloc.refresh_from_db()
         self.assertEqual(self.pto_alloc.used_amount, 10.0)
@@ -147,7 +148,20 @@ class TimeOffModuleTestCase(TestCase):
             'reason': 'Personal'
         }, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data['duration'], 5)
+        # 2026-07-01 (Wed) to 2026-07-05 (Sun) has 3 working days (Wed, Thu, Fri)
+        self.assertEqual(response.data['duration'], 3)
+
+    def test_friday_to_monday_counts_as_2_days(self):
+        # 2026-06-05 is Friday, 2026-06-08 is Monday
+        response = self.client.post('/api/time-off/requests/', {
+            'employee': self.employee.id,
+            'time_off_type': self.unpaid_type.id,
+            'date_from': '2026-06-05',
+            'date_to': '2026-06-08',
+            'reason': 'Weekend bridge'
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['duration'], 2)
 
     def test_employee_role_cannot_approve_request_returns_403(self):
         emp_user = User.objects.create_user(username='timeoff_emp', password='Password123!')
@@ -172,4 +186,65 @@ class TimeOffModuleTestCase(TestCase):
         self.client.force_authenticate(user=emp_user)
 
         res = self.client.post('/api/time-off/types/', {'name': 'Illegal Type'}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_hr_payroll_manager_cannot_approve_or_refuse_request_returns_403(self):
+        payroll_mgr_group, _ = Group.objects.get_or_create(name='HR Payroll Manager')
+        pm_user = User.objects.create_user(username='hr_pm_user', password='Password123!')
+        pm_user.groups.add(payroll_mgr_group)
+        self.client.force_authenticate(user=pm_user)
+
+        req = TimeOffRequest.objects.create(
+            employee=self.employee,
+            time_off_type=self.pto_type,
+            allocation=self.pto_alloc,
+            date_from=date(2026, 8, 1),
+            date_to=date(2026, 8, 2),
+            paid_duration=2.0,
+            status=TimeOffRequest.Status.SUBMITTED
+        )
+
+        approve_res = self.client.post(f'/api/time-off/requests/{req.id}/approve/')
+        self.assertEqual(approve_res.status_code, status.HTTP_403_FORBIDDEN)
+
+        refuse_res = self.client.post(f'/api/time-off/requests/{req.id}/refuse/')
+        self.assertEqual(refuse_res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_bulk_allocate_leave_type(self):
+        # Create second employee Bob who has no allocation yet
+        emp2 = Employee.objects.create(
+            first_name='Bob',
+            last_name='Jones',
+            email='bob@peoplepay.com',
+            department='Sales',
+            job_position='Account Exec',
+            date_joined=date(2025, 1, 1),
+            status=Employee.Status.ACTIVE
+        )
+
+        res = self.client.post(f'/api/time-off/types/{self.pto_type.id}/bulk-allocate/', {
+            'allocated_amount': 12,
+            'valid_from': '2026-01-01',
+            'valid_until': '2026-12-31'
+        }, format='json')
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        # self.employee (Alice) already has pto_alloc for 2026 (skipped=1), emp2 (Bob) gets created (created=1)
+        self.assertEqual(res.data['data']['created'], 1)
+        self.assertEqual(res.data['data']['skipped'], 1)
+
+        bob_alloc = TimeOffAllocation.objects.filter(employee=emp2, time_off_type=self.pto_type).first()
+        self.assertIsNotNone(bob_alloc)
+        self.assertEqual(float(bob_alloc.allocated_amount), 12.0)
+
+    def test_bulk_allocate_non_admin_returns_403(self):
+        emp_user = User.objects.create_user(username='bulk_emp', password='Password123!')
+        emp_user.groups.add(self.emp_group)
+        self.client.force_authenticate(user=emp_user)
+
+        res = self.client.post(f'/api/time-off/types/{self.pto_type.id}/bulk-allocate/', {
+            'allocated_amount': 12,
+            'valid_from': '2026-01-01',
+            'valid_until': '2026-12-31'
+        }, format='json')
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)

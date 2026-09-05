@@ -28,9 +28,9 @@ export const PayslipsListPage: React.FC = () => {
 
   const filtered = payslips.filter(
     (ps) =>
-      ps.reference.toLowerCase().includes(search.toLowerCase()) ||
-      ps.employeeName.toLowerCase().includes(search.toLowerCase()) ||
-      ps.employeeCode.toLowerCase().includes(search.toLowerCase())
+      (ps.reference || '').toLowerCase().includes(search.toLowerCase()) ||
+      (ps.employeeName || '').toLowerCase().includes(search.toLowerCase()) ||
+      (ps.employeeCode || '').toLowerCase().includes(search.toLowerCase())
   );
 
   const columns: Column<Payslip>[] = [
@@ -60,13 +60,13 @@ export const PayslipsListPage: React.FC = () => {
       key: 'grossWage',
       header: 'Gross Wage',
       align: 'right',
-      accessor: (item) => formatCurrency(item.grossWage),
+      accessor: (item) => formatCurrency(Number(item.grossWage || item.gross) || 0),
     },
     {
       key: 'netWage',
       header: 'Net Wage',
       align: 'right',
-      accessor: (item) => <span className="font-bold text-blue-600">{formatCurrency(item.netWage)}</span>,
+      accessor: (item) => <span className="font-bold text-blue-600">{formatCurrency(Number(item.netWage || item.net) || 0)}</span>,
     },
     {
       key: 'status',
@@ -78,10 +78,6 @@ export const PayslipsListPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-3 shadow-xs">
-        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-        <span>Demo data — backend not yet connected</span>
-      </div>
       <PageHeader
         title="Employee Payslips"
         subtitle="View and download individual computed salary slips and deduction itemizations."
@@ -96,7 +92,7 @@ export const PayslipsListPage: React.FC = () => {
       <DataTable
         columns={columns}
         data={filtered}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => String(item.id)}
         isLoading={isLoading}
         onRowClick={(item) => navigate(`/payroll/payslips/${item.id}`)}
         actions={(item) => (

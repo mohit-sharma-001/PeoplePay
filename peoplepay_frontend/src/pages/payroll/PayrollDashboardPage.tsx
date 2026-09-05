@@ -33,10 +33,6 @@ export const PayrollDashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-3 shadow-xs">
-        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-        <span>Demo data — backend not yet connected</span>
-      </div>
       <PageHeader
         title="Payroll Management"
         subtitle="Process monthly payruns, calculate salary structures, generate payslips, and review rules."
@@ -122,7 +118,7 @@ export const PayrollDashboardPage: React.FC = () => {
                 <p className="text-slate-500 mt-0.5">{pr.name} ({pr.totalEmployees} employees)</p>
               </div>
               <div className="text-right">
-                <p className="font-bold text-sm text-slate-900">{formatCurrency(pr.totalNet)}</p>
+                <p className="font-bold text-sm text-slate-900">{formatCurrency(Number(pr.totalNet) || 0)}</p>
                 <p className="text-slate-400">Total Net Payout</p>
               </div>
             </div>

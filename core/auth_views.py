@@ -31,6 +31,20 @@ def login_view(request):
 
     user = authenticate(username=username, password=password)
     if not user:
+        # Check if login identifier is an email address
+        user_by_email = User.objects.filter(email__iexact=username).first()
+        if user_by_email and user_by_email.check_password(password):
+            user = user_by_email
+
+    if not user:
+        existing_user = User.objects.filter(username=username).first() or User.objects.filter(email__iexact=username).first()
+        if existing_user and existing_user.check_password(password) and not existing_user.is_active:
+            return api_response(
+                message="This account has been disabled.",
+                status_code=status.HTTP_403_FORBIDDEN,
+                errors={"account": "This account has been disabled."}
+            )
+
         return api_response(
             message="Invalid username or password.",
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -39,9 +53,9 @@ def login_view(request):
 
     if not user.is_active:
         return api_response(
-            message="User account is inactive.",
+            message="This account has been disabled.",
             status_code=status.HTTP_403_FORBIDDEN,
-            errors={"account": "This account is inactive."}
+            errors={"account": "This account has been disabled."}
         )
 
     token, _ = Token.objects.get_or_create(user=user)
@@ -269,6 +283,7 @@ def list_users_view(request):
             "is_superuser": u.is_superuser,
             "roles": list(u.groups.values_list('name', flat=True)),
             "employee_id": emp.id if emp else None,
+            "employee_code": emp.employee_code if emp else None,
             "employee_name": f"{emp.first_name} {emp.last_name}" if emp else None,
         })
 

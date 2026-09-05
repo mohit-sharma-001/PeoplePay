@@ -123,7 +123,8 @@ class TimeOffRequestSerializer(serializers.ModelSerializer):
                 "date_to": "End date cannot be prior to start date."
             })
 
-        requested_duration = (date_to - date_from).days + 1 if (date_from and date_to and date_to >= date_from) else 0
+        from time_off.holidays import calculate_working_days
+        requested_duration = calculate_working_days(date_from, date_to) if (date_from and date_to) else 0
 
         if time_off_type and time_off_type.requires_allocation:
             if not allocation:

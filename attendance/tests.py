@@ -63,6 +63,37 @@ class AttendanceAPITestCase(TestCase):
         self.assertEqual(res_out.status_code, status.HTTP_200_OK)
         self.assertIsNotNone(res_out.data['data']['check_out'])
 
+    def test_my_status_with_and_without_open_checkin(self):
+        # 1. No open checkin initially
+        res_initial = self.client.get('/api/attendance/my-status/')
+        self.assertEqual(res_initial.status_code, status.HTTP_200_OK)
+        self.assertFalse(res_initial.data['data']['has_open_checkin'])
+        self.assertIsNone(res_initial.data['data']['attendance'])
+
+        # 2. After checking in
+        self.client.post('/api/attendance/check-in/')
+        res_open = self.client.get('/api/attendance/my-status/')
+        self.assertEqual(res_open.status_code, status.HTTP_200_OK)
+        self.assertTrue(res_open.data['data']['has_open_checkin'])
+        self.assertIsNotNone(res_open.data['data']['attendance'])
+        self.assertEqual(res_open.data['data']['attendance']['employee'], self.employee.id)
+
+        # 3. After checking out
+        self.client.post('/api/attendance/check-out/')
+        res_closed = self.client.get('/api/attendance/my-status/')
+        self.assertEqual(res_closed.status_code, status.HTTP_200_OK)
+        self.assertFalse(res_closed.data['data']['has_open_checkin'])
+        self.assertIsNone(res_closed.data['data']['attendance'])
+
+    def test_my_status_user_without_employee(self):
+        no_emp_user = User.objects.create_user(username='noempuser', password='Password123!')
+        no_emp_user.groups.add(self.emp_group)
+        self.client.force_authenticate(user=no_emp_user)
+        res = self.client.get('/api/attendance/my-status/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertFalse(res.data['data']['has_open_checkin'])
+        self.assertIsNone(res.data['data']['attendance'])
+
     def test_date_range_filtering(self):
         now = timezone.now()
         Attendance.objects.create(
