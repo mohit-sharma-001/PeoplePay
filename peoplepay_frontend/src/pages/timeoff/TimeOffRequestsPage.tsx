@@ -87,9 +87,13 @@ export const TimeOffRequestsPage: React.FC = () => {
       date_to: dateTo,
       reason: reason.trim(),
     };
+    if (user?.employee_id) {
+      payload.employee = parseInt(String(user.employee_id), 10);
+    }
     if (allocationId) {
       payload.allocation = parseInt(allocationId, 10);
     }
+
 
     try {
       const res = await timeOffApi.createRequest(payload);

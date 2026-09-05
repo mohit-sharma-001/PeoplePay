@@ -56,4 +56,13 @@ export const contractsApi = {
     });
     return { ...res, data: mapContract(res.data) };
   },
+
+  async update(id: string, payload: any): Promise<ApiResponse<Contract>> {
+    const res = await apiFetch<any>(`/api/contracts/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+    return { ...res, data: mapContract(res.data) };
+  },
 };
+

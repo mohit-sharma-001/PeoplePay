@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, ExternalLink, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Plus, ExternalLink, Pencil, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { DataTable, Column } from '../../components/shared/DataTable';
 import { SearchInput } from '../../components/shared/SearchInput';
@@ -33,6 +33,7 @@ export const ContractsListPage: React.FC = () => {
 
   // Modal & Form State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingContract, setEditingContract] = useState<Contract | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -76,6 +77,7 @@ export const ContractsListPage: React.FC = () => {
   };
 
   const resetForm = () => {
+    setEditingContract(null);
     if (employees.length > 0) {
       setEmployeeId(employees[0].id);
       setDepartment(employees[0].department || 'Engineering');
@@ -89,7 +91,21 @@ export const ContractsListPage: React.FC = () => {
     setGlobalError(null);
   };
 
-  const handleCreateContract = async (e: React.FormEvent) => {
+  const handleOpenEditModal = (c: Contract) => {
+    setEditingContract(c);
+    setEmployeeId(c.employeeId);
+    setWage(String(c.wage || ''));
+    setDateStart(c.startDate ? c.startDate.split('T')[0] : new Date().toISOString().split('T')[0]);
+    setDateEnd(c.endDate ? c.endDate.split('T')[0] : '');
+    setStateVal((c.status || 'Running').toLowerCase());
+    setDepartment(c.department || 'Engineering');
+    setJobPosition(c.jobTitle || 'Software Engineer');
+    setFieldErrors({});
+    setGlobalError(null);
+    setIsModalOpen(true);
+  };
+
+  const handleSaveContract = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!employeeId) {
       setGlobalError('Please select an employee.');
@@ -110,15 +126,20 @@ export const ContractsListPage: React.FC = () => {
     };
 
     try {
-      await contractsApi.create(payload);
-      setToastMessage('Contract created successfully!');
+      if (editingContract) {
+        await contractsApi.update(editingContract.id, payload);
+        setToastMessage('Contract updated successfully!');
+      } else {
+        await contractsApi.create(payload);
+        setToastMessage('Contract created successfully!');
+      }
       setIsModalOpen(false);
       resetForm();
       await loadData();
       setTimeout(() => setToastMessage(null), 4000);
     } catch (err: any) {
       if (err instanceof ApiError) {
-        let msg = err.message || 'Failed to create contract.';
+        let msg = err.message || (editingContract ? 'Failed to update contract.' : 'Failed to create contract.');
         if (err.errors) {
           if (typeof err.errors === 'string') {
             msg = err.errors;
@@ -129,14 +150,9 @@ export const ContractsListPage: React.FC = () => {
             }
           }
         }
-        // Explicitly check for active contract conflict message
-        if (msg.toLowerCase().includes('already has an active running contract') || msg.toLowerCase().includes('active running contract')) {
-          setGlobalError(msg);
-        } else {
-          setGlobalError(msg);
-        }
+        setGlobalError(msg);
       } else {
-        setGlobalError(err?.message || 'Failed to create contract.');
+        setGlobalError(err?.message || 'Failed to save contract.');
       }
     } finally {
       setSubmitting(false);
@@ -224,7 +240,7 @@ export const ContractsListPage: React.FC = () => {
         subtitle="Manage salary agreements, contract terms, structures, and validity periods."
         breadcrumbs={[{ label: 'Contracts' }]}
         actions={
-          <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setIsModalOpen(true)}>
+          <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => { resetForm(); setIsModalOpen(true); }}>
             New Contract
           </Button>
         }
@@ -239,15 +255,22 @@ export const ContractsListPage: React.FC = () => {
         isLoading={isLoading}
         onRowClick={(item) => navigate(`/contracts/${item.id}`)}
         actions={(item) => (
-          <IconButton
-            icon={<ExternalLink className="w-4 h-4" />}
-            label="View contract"
-            onClick={() => navigate(`/contracts/${item.id}`)}
-          />
+          <div className="flex items-center gap-1">
+            <IconButton
+              icon={<Pencil className="w-4 h-4 text-blue-600" />}
+              label="Edit contract"
+              onClick={() => handleOpenEditModal(item)}
+            />
+            <IconButton
+              icon={<ExternalLink className="w-4 h-4" />}
+              label="View contract"
+              onClick={() => navigate(`/contracts/${item.id}`)}
+            />
+          </div>
         )}
       />
 
-      {/* New Contract Modal */}
+      {/* Create / Edit Contract Modal */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => {
@@ -256,21 +279,21 @@ export const ContractsListPage: React.FC = () => {
             resetForm();
           }
         }}
-        title="Create New Contract"
-        description="Assign salary terms and employment contract period to an employee."
+        title={editingContract ? 'Edit Employment Contract' : 'Create New Contract'}
+        description={editingContract ? 'Update salary terms and employment contract period.' : 'Assign salary terms and employment contract period to an employee.'}
         maxWidth="lg"
         footer={
           <>
             <Button variant="outline" onClick={() => { setIsModalOpen(false); resetForm(); }} disabled={submitting}>
               Cancel
             </Button>
-            <Button onClick={handleCreateContract} disabled={submitting} leftIcon={submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : undefined}>
-              {submitting ? 'Saving...' : 'Create Contract'}
+            <Button onClick={handleSaveContract} disabled={submitting} leftIcon={submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : undefined}>
+              {submitting ? 'Saving...' : editingContract ? 'Update Contract' : 'Create Contract'}
             </Button>
           </>
         }
       >
-        <form onSubmit={handleCreateContract} className="space-y-4 text-left">
+        <form onSubmit={handleSaveContract} className="space-y-4 text-left">
           {globalError && (
             <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-start gap-2.5 shadow-xs">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
@@ -286,6 +309,7 @@ export const ContractsListPage: React.FC = () => {
             options={employeeOptions}
             value={employeeId}
             onChange={(e) => handleEmployeeChange(e.target.value)}
+            disabled={!!editingContract}
             required
           />
 
@@ -344,3 +368,4 @@ export const ContractsListPage: React.FC = () => {
     </div>
   );
 };
+
