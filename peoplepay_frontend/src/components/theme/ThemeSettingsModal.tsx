@@ -1,13 +1,12 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sun, Moon, Sparkles, X, CheckCircle2, Clapperboard, CircleDot, Palette, Shield } from 'lucide-react';
+import { Sun, Moon, Sparkles, X, CheckCircle2, Clapperboard, CircleDot } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
-import { BrandPreset, ThemeMode, CustomBackground } from '../../types/theme';
 import { cn } from '../../lib/utils';
 import { IconButton } from '../ui/IconButton';
 
 export const ThemeSettingsModal: React.FC = () => {
-  const { brandPreset, themeMode, customBg, setBrandPreset, setThemeMode, setCustomBg, isSettingsOpen, closeSettings } = useTheme();
+  const { themeMode, customBg, setThemeMode, setCustomBg, isSettingsOpen, closeSettings } = useTheme();
 
   if (!isSettingsOpen) return null;
 
@@ -37,60 +36,14 @@ export const ThemeSettingsModal: React.FC = () => {
             <div>
               <h3 className="text-lg font-bold tracking-tight">Appearance & Theme Settings</h3>
               <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-                Customize global visual theme, brand color scheme, and background.
+                Customize global visual theme and custom background options.
               </p>
             </div>
             <IconButton icon={<X className="w-4 h-4" />} label="Close settings" onClick={closeSettings} />
           </div>
 
-          {/* Section 0: Brand Color Palette Selection */}
+          {/* Main Appearance Mode Selection */}
           <div className="space-y-3">
-            <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] flex items-center gap-1.5">
-              <Palette className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
-              Brand Color Scheme
-            </label>
-
-            <div className="grid grid-cols-2 gap-3">
-              {/* Odoo Purple Palette */}
-              <button
-                type="button"
-                onClick={() => setBrandPreset('odoo-purple')}
-                className={cn(
-                  'p-3.5 rounded-xl border flex flex-col items-start gap-2 text-xs font-semibold transition-all cursor-pointer select-none text-left',
-                  brandPreset === 'odoo-purple'
-                    ? 'border-[#714B67] bg-[#F3EDF2] text-[#714B67] ring-2 ring-[#714B67]/30 shadow-xs'
-                    : 'border-[var(--border-color)] hover:bg-[var(--bg-surface-elevated)] text-[var(--text-secondary)]'
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full bg-[#714B67] ring-2 ring-[#F59E0B]" />
-                  <span>Odoo Purple</span>
-                </div>
-                <span className="text-[10px] text-[var(--text-muted)] font-normal">Muted Purple & Warm Orange</span>
-              </button>
-
-              {/* Classic Blue Palette */}
-              <button
-                type="button"
-                onClick={() => setBrandPreset('classic-blue')}
-                className={cn(
-                  'p-3.5 rounded-xl border flex flex-col items-start gap-2 text-xs font-semibold transition-all cursor-pointer select-none text-left',
-                  brandPreset === 'classic-blue'
-                    ? 'border-[#2563EB] bg-[#EFF6FF] text-[#2563EB] ring-2 ring-[#2563EB]/30 shadow-xs'
-                    : 'border-[var(--border-color)] hover:bg-[var(--bg-surface-elevated)] text-[var(--text-secondary)]'
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full bg-[#2563EB] ring-2 ring-[#F59E0B]" />
-                  <span>Classic Blue</span>
-                </div>
-                <span className="text-[10px] text-[var(--text-muted)] font-normal">Enterprise Blue & Slate</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Section 1: Main Appearance Mode Selection */}
-          <div className="space-y-3 pt-4 border-t border-[var(--border-color)]">
             <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">
               Appearance Mode
             </label>
@@ -143,7 +96,7 @@ export const ThemeSettingsModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Section 2: Custom Background Style Selection (Appears ONLY when Custom is selected) */}
+          {/* Custom Background Style Selection (Appears ONLY when Custom is selected) */}
           <AnimatePresence>
             {themeMode === 'custom' && (
               <motion.div
@@ -157,12 +110,9 @@ export const ThemeSettingsModal: React.FC = () => {
                   <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">
                     Custom Background Style
                   </label>
-                  <span className="text-[10px] text-[#F59E0B] font-semibold bg-[#FFF4DE] px-2 py-0.5 rounded-full">
-                    Atmosphere Only
-                  </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Cinematic Option */}
                   <button
                     type="button"
@@ -175,14 +125,19 @@ export const ThemeSettingsModal: React.FC = () => {
                     )}
                   >
                     {/* Visual Preview Graphic */}
-                    <div className="h-16 w-full rounded-lg bg-gradient-to-t from-stone-950 via-[#714B67]/30 to-[#F59E0B]/20 relative overflow-hidden mb-3 border border-white/10 flex items-center justify-center">
-                      <div className="w-12 h-12 rounded-full bg-[#714B67]/30 blur-sm absolute -top-2" />
-                      <Clapperboard className="w-5 h-5 text-amber-400 relative z-10" />
+                    <div className="h-16 w-full rounded-lg bg-gradient-to-t from-black via-stone-900 to-stone-800 relative overflow-hidden mb-3 border border-white/10 flex items-center justify-center">
+                      <div className="w-2 h-10 bg-white shadow-[0_0_12px_rgba(255,255,255,0.8)] rounded-full absolute" />
+                      <Clapperboard className="w-5 h-5 text-stone-300 relative z-10" />
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold">Cinematic</span>
-                      {customBg === 'cinematic' && <CheckCircle2 className="w-4 h-4 text-[var(--brand-primary)]" />}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold text-white">Cinematic</span>
+                        {customBg === 'cinematic' && <CheckCircle2 className="w-4 h-4 text-[var(--brand-primary)]" />}
+                      </div>
+                      <p className="text-[10px] text-stone-400 leading-snug">
+                        Immersive cinematic background with atmospheric lighting.
+                      </p>
                     </div>
                   </button>
 
@@ -202,9 +157,14 @@ export const ThemeSettingsModal: React.FC = () => {
                       <CircleDot className="w-5 h-5 text-stone-500" />
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold">Void</span>
-                      {customBg === 'void' && <CheckCircle2 className="w-4 h-4 text-[var(--brand-primary)]" />}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold text-white">Void</span>
+                        {customBg === 'void' && <CheckCircle2 className="w-4 h-4 text-[var(--brand-primary)]" />}
+                      </div>
+                      <p className="text-[10px] text-stone-400 leading-snug">
+                        Pure black minimal background with a clean editorial feel.
+                      </p>
                     </div>
                   </button>
                 </div>

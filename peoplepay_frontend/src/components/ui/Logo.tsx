@@ -1,6 +1,5 @@
 import React from 'react';
 import { cn } from '../../lib/utils';
-import { useTheme } from '../../context/ThemeContext';
 
 export interface LogoProps {
   variant?: 'full' | 'icon';
@@ -15,8 +14,6 @@ export const Logo: React.FC<LogoProps> = ({
   theme = 'light',
   className,
 }) => {
-  const { brandPreset } = useTheme();
-
   const iconSizes = {
     sm: 24,
     md: 32,
@@ -26,8 +23,8 @@ export const Logo: React.FC<LogoProps> = ({
 
   const px = iconSizes[size];
 
-  const primaryStroke = brandPreset === 'classic-blue' ? '#2563EB' : '#714B67';
-  const secondaryStroke = brandPreset === 'classic-blue' ? '#1D4ED8' : '#5B3D54';
+  const primaryStroke = '#714B67';
+  const secondaryStroke = '#5B3D54';
 
   return (
     <div className={cn('inline-flex items-center gap-3 select-none', className)}>

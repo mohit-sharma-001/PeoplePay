@@ -1,21 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { BrandPreset, ThemeMode, CustomBackground, ThemeContextType } from '../types/theme';
+import { ThemeMode, CustomBackground, ThemeContextType } from '../types/theme';
 
-const STORAGE_KEY_BRAND = 'peoplepay360-brand-preset';
 const STORAGE_KEY_THEME = 'peoplepay360-theme';
 const STORAGE_KEY_CUSTOM_BG = 'peoplepay360-custom-background';
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [brandPreset, setBrandPresetState] = useState<BrandPreset>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_BRAND);
-    if (saved === 'odoo-purple' || saved === 'classic-blue') {
-      return saved;
-    }
-    return 'odoo-purple';
-  });
-
   const [themeMode, setThemeModeState] = useState<ThemeMode>(() => {
     const saved = localStorage.getItem(STORAGE_KEY_THEME);
     if (saved === 'light' || saved === 'dark' || saved === 'custom') {
@@ -36,7 +27,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     // Apply dataset attributes to root element
-    document.documentElement.setAttribute('data-brand', brandPreset);
     document.documentElement.setAttribute('data-theme', themeMode);
     if (themeMode === 'custom') {
       document.documentElement.setAttribute('data-background', customBg);
@@ -45,14 +35,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     // Persist to localStorage
-    localStorage.setItem(STORAGE_KEY_BRAND, brandPreset);
     localStorage.setItem(STORAGE_KEY_THEME, themeMode);
     localStorage.setItem(STORAGE_KEY_CUSTOM_BG, customBg);
-  }, [brandPreset, themeMode, customBg]);
-
-  const setBrandPreset = (preset: BrandPreset) => {
-    setBrandPresetState(preset);
-  };
+  }, [themeMode, customBg]);
 
   const setThemeMode = (mode: ThemeMode) => {
     setThemeModeState(mode);
@@ -68,10 +53,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   return (
     <ThemeContext.Provider
       value={{
-        brandPreset,
         themeMode,
         customBg,
-        setBrandPreset,
         setThemeMode,
         setCustomBg,
         isSettingsOpen,

@@ -1,12 +1,13 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import { User, Role } from '../types/auth';
+import { authService } from '../services/authService';
 import { mockUsers } from '../data/mockUsers';
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, pass: string) => Promise<boolean>;
+  login: (emailOrUsername: string, pass: string) => Promise<boolean>;
   logout: () => void;
   switchRole: (role: Role) => void;
 }
@@ -14,29 +15,36 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Default logged-in user is Admin as specified in Prompt
-  const [user, setUser] = useState<User | null>(mockUsers[0]);
+  const [user, setUser] = useState<User | null>(() => authService.getCurrentUser());
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  const login = async (email: string, _pass: string): Promise<boolean> => {
+  const login = async (emailOrUsername: string, pass: string): Promise<boolean> => {
     setIsLoading(true);
-    await new Promise((res) => setTimeout(res, 400));
-    const found = mockUsers.find((u) => u.email.toLowerCase() === email.toLowerCase()) || mockUsers[0];
-    setUser(found);
-    setIsLoading(false);
-    return true;
+    try {
+      const res = await authService.login({ emailOrUsername, password: pass });
+      if (res.success && res.user) {
+        setUser(res.user);
+        setIsLoading(false);
+        return true;
+      }
+      setIsLoading(false);
+      return false;
+    } catch {
+      setIsLoading(false);
+      return false;
+    }
   };
 
   const logout = () => {
+    authService.logout();
     setUser(null);
   };
 
   const switchRole = (newRole: Role) => {
     const matchingUser = mockUsers.find((u) => u.role === newRole);
-    if (matchingUser) {
-      setUser(matchingUser);
-    } else if (user) {
-      setUser({ ...user, role: newRole });
+    const updatedUser = matchingUser || (user ? { ...user, role: newRole } : null);
+    if (updatedUser) {
+      setUser(updatedUser);
     }
   };
 
