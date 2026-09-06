@@ -159,6 +159,14 @@ export const payrollApi = {
     return { ...res, data: mapPayrun(res.data) };
   },
 
+  async sendPayslips(id: string | number): Promise<ApiResponse<{ sent: number; skipped: number; skipped_employees: string[] }>> {
+    const res = await apiFetch<any>(`/api/payroll/payruns/${id}/send-payslips/`, {
+      method: 'POST',
+    });
+    return res;
+  },
+
+
   async getPayslips(payrunId?: string): Promise<ApiResponse<Payslip[]>> {
     const url = payrunId ? `/api/payroll/payslips/?payrun=${payrunId}` : '/api/payroll/payslips/';
     const res = await apiFetch<any[]>(url, {}, mockPayslips);

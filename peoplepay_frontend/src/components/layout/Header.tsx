@@ -5,6 +5,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { Avatar } from '../ui/Avatar';
 import { Dropdown } from '../ui/Dropdown';
 import { AttendanceWidget } from './AttendanceWidget';
+import { NotificationWidget } from './NotificationWidget';
 
 export interface HeaderProps {
   onOpenMobileSidebar: () => void;
@@ -46,7 +47,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileSidebar }) => {
         </div>
       </div>
 
-      {/* Right: Appearance Button, Role Badge, User Profile */}
+      {/* Right: Appearance Button, Role Badge, Notification Button, User Profile */}
       <div className="flex items-center gap-3">
         {/* Global Appearance / Theme Trigger Button */}
         <button
@@ -67,6 +68,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileSidebar }) => {
             {displayRoles}
           </span>
         </div>
+
+        {/* Mail & System Notifications Widget (Synced with Backend) */}
+        <NotificationWidget />
 
         {/* Live Attendance Check-In / Check-Out Widget */}
         <AttendanceWidget />

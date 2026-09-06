@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Play, CheckCircle, DollarSign, AlertTriangle, Edit, X, Check, Users, Calendar, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Play, CheckCircle, DollarSign, AlertTriangle, Edit, X, Check, Users, Calendar, ArrowRight, Mail } from 'lucide-react';
+
 import { PageHeader } from '../../components/shared/PageHeader';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { StatusBadge } from '../../components/shared/StatusBadge';
@@ -24,6 +25,8 @@ export const PayrunDetailsPage: React.FC = () => {
   const [payslips, setPayslips] = useState<Payslip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
 
   // Edit Modal State (Draft Payruns)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -176,6 +179,33 @@ export const PayrunDetailsPage: React.FC = () => {
     }
   };
 
+  const handleSendPayslips = async () => {
+    if (!id || !payrun) return;
+    const confirmed = window.confirm("Send payslip emails to all employees in this payrun?");
+    if (!confirmed) return;
+
+    setIsProcessing(true);
+    try {
+      const res = await payrollApi.sendPayslips(id);
+      if (res.data) {
+        const { sent, skipped } = res.data;
+        let summaryMsg = `Sent to ${sent} employee${sent === 1 ? '' : 's'}.`;
+        if (skipped > 0) {
+          summaryMsg += ` ${skipped} skipped (no email on file / excluded).`;
+        }
+        setToastMessage(summaryMsg);
+        setTimeout(() => setToastMessage(null), 5000);
+      } else {
+        alert(res.message || 'Failed to send payslips.');
+      }
+    } catch (err: any) {
+      alert(err.message || 'An error occurred while sending payslips.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+
   if (isLoading) return <div className="p-8 text-center text-slate-500">Loading payrun details...</div>;
 
   if (!payrun) {
@@ -285,12 +315,32 @@ export const PayrunDetailsPage: React.FC = () => {
               </Button>
             )}
 
+            {canApprove && payrun.status !== 'draft' && (
+              <Button
+                variant="outline"
+                leftIcon={<Mail className="w-4 h-4" />}
+                onClick={handleSendPayslips}
+                isLoading={isProcessing}
+                disabled={isProcessing}
+              >
+                Send Payslips
+              </Button>
+            )}
+
             <Button variant="outline" leftIcon={<ArrowLeft className="w-4 h-4" />} onClick={() => navigate('/payroll/payruns')}>
               Back to Payruns
             </Button>
           </div>
         }
       />
+
+      {toastMessage && (
+        <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 rounded-lg shadow-sm flex items-center justify-between font-medium text-sm">
+          <span>{toastMessage}</span>
+          <button onClick={() => setToastMessage(null)} className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-900 font-bold ml-4">✕</button>
+        </div>
+      )}
+
 
       {isEditModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">

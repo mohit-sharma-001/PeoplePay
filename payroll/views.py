@@ -3,7 +3,11 @@ from rest_framework import viewsets, permissions, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from core.permissions import HasRole
+from core.utils import api_response
 from django.http import HttpResponse
+from django.core.mail import EmailMessage
+from django.conf import settings
+from payroll.pdf_utils import generate_payslip_pdf
 
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
@@ -92,7 +96,9 @@ class PayrunViewSet(viewsets.ModelViewSet):
         'compute': ['Admin', 'HR Payroll Manager', 'HR Payroll User'],
         'validate': ['Admin', 'HR Payroll Manager'],
         'mark_paid': ['Admin', 'HR Payroll Manager'],
+        'send_payslips': ['Admin', 'HR Payroll Manager'],
     }
+
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['reference', 'structure__name', 'status']
     ordering_fields = ['reference', 'created_at', 'date_from', 'date_to', 'status']
@@ -297,6 +303,111 @@ class PayrunViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(payrun)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=['post'], url_path='send-payslips')
+    def send_payslips(self, request, pk=None):
+        payrun = self.get_object()
+
+        if payrun.status == Payrun.Status.DRAFT:
+            return api_response(
+                message="Cannot send payslips for a draft payrun.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+                errors={"status": "Cannot send payslips for a draft payrun."}
+            )
+
+        payslips = payrun.payslips.select_related('employee', 'employee__user').all()
+
+        sent_count = 0
+        skipped_count = 0
+        skipped_employees = []
+
+        for payslip in payslips:
+            emp = payslip.employee
+
+            if payslip.is_excluded:
+                skipped_count += 1
+                emp_code = emp.employee_code if emp else 'EMP'
+                skipped_employees.append(f"{emp_code} - excluded")
+                continue
+
+            email = emp.email if (emp and emp.email) else (emp.user.email if (emp and emp.user and emp.user.email) else None)
+
+            if not email or '@' not in email:
+                skipped_count += 1
+                emp_code = emp.employee_code if emp else 'EMP'
+                skipped_employees.append(f"{emp_code} - no email")
+                continue
+
+            try:
+                pdf_bytes = generate_payslip_pdf(payslip)
+
+                if payrun.date_from and payrun.date_to:
+                    date_from_str = payrun.date_from.strftime('%Y-%m-%d')
+                    date_to_str = payrun.date_to.strftime('%Y-%m-%d')
+                    period_title = f"{date_from_str} to {date_to_str}"
+                else:
+                    date_from_str = "N/A"
+                    date_to_str = "N/A"
+                    period_title = payrun.reference or payrun.name
+
+                emp_name = f"{emp.first_name} {emp.last_name}" if emp else "Employee"
+                net_val = float(payslip.net) if payslip.net is not None else 0.0
+
+                subject = f"Your Payslip for {period_title}"
+                body = (
+                    f"Dear {emp_name}, please find your payslip for {date_from_str} to {date_to_str} attached. "
+                    f"Net Pay: ₹{net_val:,.2f}.\n\n"
+                    f"— PeoplePay360"
+                )
+
+                email_msg = EmailMessage(
+                    subject=subject,
+                    body=body,
+                    from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'payroll@peoplepay360.com'),
+                    to=[email],
+                )
+                filename = f"payslip_{emp.employee_code if emp else 'EMP'}_{date_from_str}.pdf"
+                email_msg.attach(filename, pdf_bytes, 'application/pdf')
+                email_msg.send(fail_silently=False)
+
+                sent_count += 1
+
+                from core.models import Notification
+                Notification.objects.create(
+                    user=emp.user if (emp and emp.user) else request.user,
+                    payslip=payslip,
+                    title=f"Payslip Email Sent - {emp_name}",
+                    message=f"Payslip email delivered to {email} for period {period_title}. Net Pay: ₹{net_val:,.2f}.",
+                    notification_type="email",
+                    is_read=False
+                )
+            except Exception as e:
+                skipped_count += 1
+                emp_code = emp.employee_code if emp else 'EMP'
+                skipped_employees.append(f"{emp_code} - send error: {str(e)}")
+
+        if request.user and request.user.is_authenticated and sent_count > 0:
+            from core.models import Notification
+            Notification.objects.create(
+                user=request.user,
+                title="Bulk Payslip Email Distribution Complete",
+                message=f"Successfully sent {sent_count} payslip email(s) for payrun {payrun.reference or payrun.name}. {skipped_count} skipped.",
+                notification_type="email",
+                is_read=False
+            )
+
+        data = {
+            "sent": sent_count,
+            "skipped": skipped_count,
+            "skipped_employees": skipped_employees
+        }
+
+        return api_response(
+            data=data,
+            message=f"Payslips sent to {sent_count} employees. {skipped_count} skipped.",
+            status_code=status.HTTP_200_OK
+        )
+
+
 
 class PayslipViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -396,213 +507,30 @@ class PayslipViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = self.get_serializer(payslip)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny])
     def pdf(self, request, pk=None):
+        token_key = request.query_params.get('token')
+        user = request.user
+        if token_key:
+            from rest_framework.authtoken.models import Token
+            try:
+                token_obj = Token.objects.select_related('user').get(key=token_key)
+                user = token_obj.user
+            except Exception:
+                pass
+
+        if not user or not user.is_authenticated:
+            return Response({"error": "Authentication required."}, status=status.HTTP_401_UNAUTHORIZED)
+
         payslip = self.get_object()
-
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=letter,
-            rightMargin=36,
-            leftMargin=36,
-            topMargin=36,
-            bottomMargin=36
-        )
-        styles = getSampleStyleSheet()
-
-        title_style = ParagraphStyle(
-            'DocTitle',
-            parent=styles['Heading1'],
-            fontName='Helvetica-Bold',
-            fontSize=22,
-            textColor=colors.HexColor('#714B67'),
-            spaceAfter=2
-        )
-        subtitle_style = ParagraphStyle(
-            'DocSubTitle',
-            parent=styles['Normal'],
-            fontName='Helvetica-Bold',
-            fontSize=12,
-            textColor=colors.HexColor('#64748B'),
-            spaceAfter=12
-        )
-        section_heading_style = ParagraphStyle(
-            'SectionHeading',
-            parent=styles['Heading2'],
-            fontName='Helvetica-Bold',
-            fontSize=12,
-            textColor=colors.HexColor('#1E293B'),
-            spaceBefore=10,
-            spaceAfter=6
-        )
-        cell_bold = ParagraphStyle('CellBold', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10)
-        cell_normal = ParagraphStyle('CellNormal', parent=styles['Normal'], fontName='Helvetica', fontSize=10)
-        cell_right = ParagraphStyle('CellRight', parent=styles['Normal'], fontName='Helvetica', fontSize=10, alignment=2)
-        cell_right_bold = ParagraphStyle('CellRightBold', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, alignment=2)
-
-        elements = []
-
-        # Header
-        elements.append(Paragraph('PeoplePay360', title_style))
-        elements.append(Paragraph('PAYSLIP', subtitle_style))
-        elements.append(Spacer(1, 6))
-
-        # Employee & Payrun Metadata Box
-        emp = payslip.employee
-        emp_name = f"{emp.first_name} {emp.last_name}" if emp else "N/A"
-        emp_code = emp.employee_code if emp else "N/A"
-        emp_dept = emp.department if emp else "N/A"
-        emp_job = emp.job_position if emp else "N/A"
-
-        payrun = payslip.payrun
-        payrun_ref = payrun.reference if payrun else "N/A"
-        if payrun and payrun.date_from and payrun.date_to:
-            period_str = f"{payrun.date_from.strftime('%Y-%m-%d')} to {payrun.date_to.strftime('%Y-%m-%d')}"
-        else:
-            period_str = "N/A"
-        status_str = payslip.status.upper() if payslip.status else "DRAFT"
-
-        meta_data = [
-            [
-                Paragraph(f"<b>Employee Name:</b> {emp_name}", cell_normal),
-                Paragraph(f"<b>Payrun Ref:</b> {payrun_ref}", cell_normal)
-            ],
-            [
-                Paragraph(f"<b>Employee Code:</b> {emp_code}", cell_normal),
-                Paragraph(f"<b>Pay Period:</b> {period_str}", cell_normal)
-            ],
-            [
-                Paragraph(f"<b>Department:</b> {emp_dept}", cell_normal),
-                Paragraph(f"<b>Status:</b> {status_str}", cell_normal)
-            ],
-            [
-                Paragraph(f"<b>Job Position:</b> {emp_job}", cell_normal),
-                Paragraph("", cell_normal)
-            ]
-        ]
-
-        meta_table = Table(meta_data, colWidths=[270, 270])
-        meta_table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F8FAFC')),
-            ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#CBD5E1')),
-            ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
-            ('PADDING', (0,0), (-1,-1), 6),
-        ]))
-        elements.append(meta_table)
-        elements.append(Spacer(1, 14))
-
-        # Attendance-Based Proration Section
-        exp_hrs = payslip.expected_hours
-        act_hrs = payslip.actual_hours
-        worked_pct = payslip.worked_percentage
-
-        exp_hrs_str = f"{float(exp_hrs):.1f}h" if exp_hrs is not None else "N/A (No Schedule)"
-        act_hrs_str = f"{float(act_hrs):.1f}h" if act_hrs is not None else "0.0h"
-        pct_str = f"{float(worked_pct) * 100:.1f}%" if worked_pct is not None else "100.0%"
-
-        elements.append(Paragraph('Attendance-Based Proration', section_heading_style))
-        proration_text = f"Expected Hours: <b>{exp_hrs_str}</b> &nbsp;|&nbsp; Actual Hours: <b>{act_hrs_str}</b> &nbsp;|&nbsp; Worked: <b>{pct_str}</b>"
-        elements.append(Paragraph(proration_text, cell_normal))
-        elements.append(Spacer(1, 10))
-
-        # Salary Breakdown Table
-        elements.append(Paragraph('Salary Component Breakdown', section_heading_style))
-
-        rule_map = {}
-        if payrun and payrun.structure:
-            for r in payrun.structure.rules.all():
-                rule_map[r.code] = r.name
-
-        EXCLUDED_PDF_KEYS = {'WORKED_DAYS', 'PUBLIC_HOLIDAYS', 'WORK_DAYS'}
-        breakdown_data = [
-            [Paragraph('<b>Rule / Component Code</b>', cell_bold), Paragraph('<b>Amount</b>', cell_right_bold)]
-        ]
-
-        line_items = payslip.line_items or {}
-        filtered_items = [(k, v) for k, v in line_items.items() if k not in EXCLUDED_PDF_KEYS]
-
-        if filtered_items:
-            for code, val in filtered_items:
-                if code == 'CONTRACT_WAGE':
-                    label = "Contract Wage (Reference)"
-                elif code in rule_map:
-                    label = f"{rule_map[code]} ({code})"
-                else:
-                    label = code
-                try:
-                    amt_val = float(val)
-                    amt_str = f"Rs. {amt_val:,.2f}"
-                except (ValueError, TypeError):
-                    amt_str = str(val)
-                breakdown_data.append([
-                    Paragraph(label, cell_normal),
-                    Paragraph(amt_str, cell_right)
-                ])
-        else:
-            breakdown_data.append([
-                Paragraph("No computed salary components.", cell_normal),
-                Paragraph("Rs. 0.00", cell_right)
-            ])
-
-        breakdown_table = Table(breakdown_data, colWidths=[370, 170])
-        breakdown_table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F1F5F9')),
-            ('LINEBELOW', (0,0), (-1,0), 1.5, colors.HexColor('#CBD5E1')),
-            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
-            ('PADDING', (0,0), (-1,-1), 6),
-        ]))
-        elements.append(breakdown_table)
-        elements.append(Spacer(1, 14))
-
-        # Payslip Adjustments Section (if present)
-        adjustments = payslip.adjustments.all()
-        if adjustments:
-            elements.append(Paragraph('Payslip Adjustments', section_heading_style))
-            adj_data = [
-                [Paragraph('<b>Adjustment Label</b>', cell_bold), Paragraph('<b>Amount</b>', cell_right_bold)]
-            ]
-            for adj in adjustments:
-                try:
-                    amt_val = float(adj.amount)
-                    amt_str = f"Rs. {amt_val:,.2f}" if amt_val >= 0 else f"-Rs. {abs(amt_val):,.2f}"
-                except (ValueError, TypeError):
-                    amt_str = str(adj.amount)
-                adj_data.append([
-                    Paragraph(adj.label, cell_normal),
-                    Paragraph(amt_str, cell_right)
-                ])
-
-            adj_table = Table(adj_data, colWidths=[370, 170])
-            adj_table.setStyle(TableStyle([
-                ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F1F5F9')),
-                ('LINEBELOW', (0,0), (-1,0), 1.5, colors.HexColor('#CBD5E1')),
-                ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
-                ('PADDING', (0,0), (-1,-1), 6),
-            ]))
-            elements.append(adj_table)
-            elements.append(Spacer(1, 14))
-
-        # Bolded Net Pay Line
-        net_val = float(payslip.net) if payslip.net else 0.0
-        net_pay_style = ParagraphStyle(
-            'NetPayStyle',
-            parent=styles['Normal'],
-            fontName='Helvetica-Bold',
-            fontSize=14,
-            textColor=colors.HexColor('#714B67'),
-            alignment=2
-        )
-        elements.append(Paragraph(f"<b>Net Pay: Rs. {net_val:,.2f}</b>", net_pay_style))
-
-        doc.build(elements)
-        pdf_bytes = buffer.getvalue()
-        buffer.close()
+        pdf_bytes = generate_payslip_pdf(payslip)
 
         emp_code = payslip.employee.employee_code if payslip.employee else 'EMP'
         period = payslip.payrun.date_from.strftime('%Y-%m') if (payslip.payrun and payslip.payrun.date_from) else 'period'
         filename = f"payslip_{emp_code}_{period}.pdf"
 
         response = HttpResponse(pdf_bytes, content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        response['Content-Disposition'] = f'inline; filename="{filename}"'
+        response['X-Frame-Options'] = 'ALLOWALL'
         return response
+

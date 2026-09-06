@@ -750,6 +750,139 @@ class PayrollReportsTestCase(TestCase):
         self.assertEqual(res3.status_code, status.HTTP_403_FORBIDDEN)
 
 
+class BulkSendPayslipsTestCase(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.admin_user = User.objects.create_superuser(username='admin_mail', password='password123')
+
+        admin_grp, _ = Group.objects.get_or_create(name='Admin')
+        self.admin_user.groups.add(admin_grp)
+
+        self.emp_user = User.objects.create_user(username='emp_mail', password='password123')
+        emp_grp, _ = Group.objects.get_or_create(name='Employee')
+        self.emp_user.groups.add(emp_grp)
+
+        self.payroll_mgr = User.objects.create_user(username='pm_mail', password='password123')
+        pm_grp, _ = Group.objects.get_or_create(name='HR Payroll Manager')
+        self.payroll_mgr.groups.add(pm_grp)
+
+        self.structure = SalaryStructure.objects.create(name='Standard Structure', code='STD_MAIL')
+        self.emp1 = Employee.objects.create(
+            employee_code='EMP100',
+            first_name='Jane',
+            last_name='Doe',
+            email='jane.doe@example.com',
+            date_joined=date(2024, 1, 1),
+            department='Engineering'
+        )
+        self.contract1 = Contract.objects.create(
+            employee=self.emp1,
+            wage=60000.00,
+            date_start=date(2024, 1, 1),
+            state='running',
+            department='Engineering',
+            job_position='Engineer'
+        )
+
+    def test_send_payslips_bulk_email_delivery(self):
+        from django.core import mail
+        mail.outbox = []
+
+        self.client.force_authenticate(user=self.admin_user)
+        payrun = Payrun.objects.create(
+            structure=self.structure,
+            date_from=date(2026, 9, 1),
+            date_to=date(2026, 9, 30),
+            status='computed'
+        )
+
+        ps1 = Payslip.objects.create(
+            payrun=payrun,
+            employee=self.emp1,
+            contract=self.contract1,
+            status='computed',
+            is_excluded=False,
+            net=45000.00
+        )
+
+        # Emp 2 without email
+        emp2 = Employee.objects.create(
+            employee_code="EMP101",
+            first_name="NoEmail",
+            last_name="User",
+            email="",
+            date_joined=date(2024, 1, 1),
+            department="HR"
+        )
+        ps2 = Payslip.objects.create(
+            payrun=payrun,
+            employee=emp2,
+            status='computed',
+            is_excluded=False,
+            net=35000.00
+        )
+
+        # Excluded payslip
+        emp3 = Employee.objects.create(
+            employee_code="EMP102",
+            first_name="Excluded",
+            last_name="User",
+            email="excluded@example.com",
+            date_joined=date(2024, 1, 1),
+            department="Sales"
+        )
+        ps3 = Payslip.objects.create(
+            payrun=payrun,
+            employee=emp3,
+            status='computed',
+            is_excluded=True,
+            net=0.00
+        )
+
+        resp = self.client.post(f'/api/payroll/payruns/{payrun.id}/send-payslips/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        data = resp.data['data']
+        self.assertEqual(data['sent'], 1)
+        self.assertEqual(data['skipped'], 2)
+        self.assertIn("EMP101 - no email", data['skipped_employees'])
+        self.assertIn("EMP102 - excluded", data['skipped_employees'])
+
+        self.assertEqual(len(mail.outbox), 1)
+        sent_email = mail.outbox[0]
+        self.assertEqual(sent_email.to, ["jane.doe@example.com"])
+        self.assertIn("Your Payslip for 2026-09-01 to 2026-09-30", sent_email.subject)
+        self.assertIn("Jane Doe", sent_email.body)
+        self.assertIn("₹45,000.00", sent_email.body)
+        self.assertEqual(len(sent_email.attachments), 1)
+        att_name, att_content, att_mime = sent_email.attachments[0]
+        self.assertEqual(att_mime, 'application/pdf')
+        self.assertGreater(len(att_content), 500)
+
+    def test_send_payslips_draft_payrun_returns_400(self):
+        self.client.force_authenticate(user=self.admin_user)
+        payrun = Payrun.objects.create(
+            structure=self.structure,
+            date_from=date(2026, 9, 1),
+            date_to=date(2026, 9, 30),
+            status='draft'
+        )
+        resp = self.client.post(f'/api/payroll/payruns/{payrun.id}/send-payslips/')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_send_payslips_unauthorized_role_returns_403(self):
+        self.client.force_authenticate(user=self.emp_user)
+        payrun = Payrun.objects.create(
+            structure=self.structure,
+            date_from=date(2026, 9, 1),
+            date_to=date(2026, 9, 30),
+            status='computed'
+        )
+        resp = self.client.post(f'/api/payroll/payruns/{payrun.id}/send-payslips/')
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+
+
+
 
 
 

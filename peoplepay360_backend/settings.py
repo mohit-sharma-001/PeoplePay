@@ -174,3 +174,10 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Email Configuration
+# For production, replace with a real SMTP backend
+EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='payroll@peoplepay360.com')
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='payroll@peoplepay360.com')
+
+
