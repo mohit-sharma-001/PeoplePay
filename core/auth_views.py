@@ -262,14 +262,16 @@ def register_view(request):
 @permission_classes([IsAuthenticated, HasRole])
 def list_users_view(request):
     """
-    Admin-only endpoint to list system user accounts.
+    Endpoint to list system user accounts.
     Supports filtering by role via `?role=Employee` and employee via `?employee_id=<id>`.
     """
-    if not (request.user.is_superuser or request.user.groups.filter(name='Admin').exists()):
+    user_groups = set(request.user.groups.values_list('name', flat=True))
+    allowed_roles = {'Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User'}
+    if not (request.user.is_superuser or bool(user_groups.intersection(allowed_roles))):
         return api_response(
             message="Permission denied.",
             status_code=status.HTTP_403_FORBIDDEN,
-            errors={"permission": "Only Admin users can list system user accounts."}
+            errors={"permission": "You do not have permission to view user accounts."}
         )
 
     users = User.objects.all().select_related('employee_profile').prefetch_related('groups').order_by('id')
@@ -305,7 +307,8 @@ def list_users_view(request):
 
 
 
-list_users_view.allowed_roles = ['Admin']
+list_users_view.allowed_roles = ['Admin', 'HR Manager', 'HR Payroll Manager', 'HR Payroll User']
+
 
 
 @api_view(['PATCH'])

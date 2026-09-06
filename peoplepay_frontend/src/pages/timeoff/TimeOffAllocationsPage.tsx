@@ -1,16 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Plus } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { DataTable, Column } from '../../components/shared/DataTable';
-import { Button } from '../../components/ui/Button';
-import { usePermissions } from '../../hooks/usePermissions';
 import { timeOffApi } from '../../services/api/timeoff';
 import { TimeOffAllocation } from '../../types/timeoff';
 
 export const TimeOffAllocationsPage: React.FC = () => {
-  const { canPerformAction } = usePermissions();
-  const canManageTimeOff = canPerformAction('manage_timeoff');
-
   const [allocations, setAllocations] = useState<TimeOffAllocation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -74,13 +68,6 @@ export const TimeOffAllocationsPage: React.FC = () => {
           { label: 'Time Off', href: '/time-off' },
           { label: 'Allocations' },
         ]}
-        actions={
-          canManageTimeOff ? (
-            <Button leftIcon={<Plus className="w-4 h-4" />}>
-              New Allocation
-            </Button>
-          ) : undefined
-        }
       />
 
       <DataTable
@@ -92,3 +79,4 @@ export const TimeOffAllocationsPage: React.FC = () => {
     </div>
   );
 };
+

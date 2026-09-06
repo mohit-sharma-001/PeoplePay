@@ -233,41 +233,58 @@ export const EmployeeDetailsPage: React.FC = () => {
 
   const loadEmployeeData = async () => {
     setIsLoading(true);
-    if (!id) return;
-    const empRes = await employeesApi.getById(id);
-    setEmployee(empRes.data);
-
-    if (empRes.data) {
-      const [conRes, attRes, alcRes, usrRes] = await Promise.all([
-        contractsApi.getByEmployeeId(empRes.data.id),
-        attendanceApi.getByEmployeeId(empRes.data.id),
-        timeOffApi.getAllocationsByEmployee(empRes.data.id),
-        apiFetch<any[]>(`/api/auth/users/?employee_id=${empRes.data.id}`),
-      ]);
-      setContract(conRes.data);
-      setAttendance(attRes.data);
-      setAllocations(alcRes.data || []);
-
-      if (Array.isArray(usrRes.data) && usrRes.data.length > 0) {
-        const uObj = usrRes.data[0];
-        setUserAccountId(uObj.id);
-        setUserAccountInfo({
-          username: uObj.username,
-          roles: uObj.roles || ['Employee'],
-        });
-      } else if (empRes.data.user) {
-        setUserAccountId((empRes.data.user as any).id || null);
-        setUserAccountInfo({
-          username: empRes.data.user.username || 'Linked User',
-          roles: (empRes.data.user as any).roles || ['Employee'],
-        });
-      } else {
-        setUserAccountId(null);
-        setUserAccountInfo(null);
-      }
+    if (!id) {
+      setIsLoading(false);
+      return;
     }
-    setIsLoading(false);
+    try {
+      const empRes = await employeesApi.getById(id);
+      setEmployee(empRes.data);
+
+      if (empRes.data) {
+        const [conResult, attResult, alcResult, usrResult] = await Promise.allSettled([
+          contractsApi.getByEmployeeId(empRes.data.id),
+          attendanceApi.getByEmployeeId(empRes.data.id),
+          timeOffApi.getAllocationsByEmployee(empRes.data.id),
+          apiFetch<any[]>(`/api/auth/users/?employee_id=${empRes.data.id}`),
+        ]);
+
+        if (conResult.status === 'fulfilled' && conResult.value?.data) {
+          setContract(conResult.value.data);
+        }
+        if (attResult.status === 'fulfilled' && attResult.value?.data) {
+          setAttendance(attResult.value.data);
+        }
+        if (alcResult.status === 'fulfilled' && alcResult.value?.data) {
+          setAllocations(alcResult.value.data || []);
+        }
+
+        const usrRes = usrResult.status === 'fulfilled' ? usrResult.value : null;
+        if (usrRes && Array.isArray(usrRes.data) && usrRes.data.length > 0) {
+          const uObj = usrRes.data[0];
+          setUserAccountId(uObj.id);
+          setUserAccountInfo({
+            username: uObj.username,
+            roles: uObj.roles || ['Employee'],
+          });
+        } else if (empRes.data.user) {
+          setUserAccountId((empRes.data.user as any).id || null);
+          setUserAccountInfo({
+            username: empRes.data.user.username || 'Linked User',
+            roles: (empRes.data.user as any).roles || ['Employee'],
+          });
+        } else {
+          setUserAccountId(null);
+          setUserAccountInfo(null);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load employee details:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
+
 
   useEffect(() => {
     loadEmployeeData();
