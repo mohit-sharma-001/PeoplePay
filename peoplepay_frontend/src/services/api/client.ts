@@ -86,12 +86,14 @@ export async function apiFetch<T>(
     if (error instanceof ApiError) {
       throw error;
     }
-    console.warn(`API call to ${url} failed, using fallback data if available:`, error);
-    if (fallbackData !== undefined) {
+    console.warn(`API call to ${url} failed:`, error);
+    // Only return mock fallback data in offline dev mode without configured API URL
+    if (fallbackData !== undefined && !import.meta.env.VITE_API_BASE_URL) {
       return { data: fallbackData, status: 200, message: 'Loaded fallback data', ok: true };
     }
     throw error;
   }
+
 }
 
 // Simulated network latency helper for mock mode
