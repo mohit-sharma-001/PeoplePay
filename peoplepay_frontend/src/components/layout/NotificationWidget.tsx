@@ -4,6 +4,13 @@ import { notificationsApi, NotificationItem } from '../../services/api/notificat
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const getFullUrl = (path: string) => {
+  if (path.startsWith('http')) return path;
+  const base = API_BASE_URL.replace(/\/+$/, '');
+  return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+};
+
 export const NotificationWidget: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -46,7 +53,8 @@ export const NotificationWidget: React.FC = () => {
       }
       try {
         const token = localStorage.getItem('peoplepay_token') || localStorage.getItem('auth_token') || '';
-        const endpoint = `/api/payroll/payslips/${selectedNotification.payslip_id}/pdf/${token ? `?token=${token}` : ''}`;
+        const relativePath = `/api/payroll/payslips/${selectedNotification.payslip_id}/pdf/${token ? `?token=${token}` : ''}`;
+        const endpoint = getFullUrl(relativePath);
         const headers: Record<string, string> = {};
         if (token) {
           headers['Authorization'] = `Token ${token}`;
@@ -127,7 +135,7 @@ export const NotificationWidget: React.FC = () => {
 
   const token = localStorage.getItem('peoplepay_token') || localStorage.getItem('auth_token') || '';
   const directPdfUrl = selectedNotification?.payslip_id
-    ? `/api/payroll/payslips/${selectedNotification.payslip_id}/pdf/${token ? `?token=${token}` : ''}`
+    ? getFullUrl(`/api/payroll/payslips/${selectedNotification.payslip_id}/pdf/${token ? `?token=${token}` : ''}`)
     : null;
   const activePdfSrc = pdfBlobUrl || directPdfUrl;
 
